@@ -1,5 +1,7 @@
 
 (ns clj-orient.graph
+  #^{:doc "This namespace implements the graph oriented part of the DB."
+     :author "Eduardo Emilio Julián Pereyra"}
   (:import (com.orientechnologies.orient.core.db.graph ODatabaseGraphTx
                                                        OGraphVertex OGraphEdge)
     (com.orientechnologies.orient.core.record.impl ODocument)

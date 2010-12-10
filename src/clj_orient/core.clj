@@ -7,8 +7,7 @@
     (com.orientechnologies.orient.core.db.record ODatabaseRecord)
     (com.orientechnologies.orient.core.record.impl ODocument)
     (com.orientechnologies.orient.client.remote OServerAdmin)
-    )
-  (:use (yggdrasil audhumla)))
+    ))
 
 ;(set! *warn-on-reflection* true)
 
@@ -19,11 +18,6 @@
   ([db-loc dbpath storage]
    (-> (OServerAdmin. (str "remote:" dbpath)) .connect (.createDatabase (name storage)))))
 
-;(def *db* (create-document-db! :memory "bardb"))
-;(def *db* (create-document-db! :remote "localhost/foodb"))
-;(def *db* (create-document-db! :local "/home/eejp/orientDBs2/db2"))
-;(def *db* (open-document-db! :local "/home/eejp/orientDBs1/db1" "admin" "admin"))
-;(def *db* (open-document-db! :remote "localhost/foodb" "admin" "admin"))
 (defn open-document-db!
 "Given the DBs location as either :local, :remote or :memory and the path (with optional admin and password data), opens
 the desired DB."

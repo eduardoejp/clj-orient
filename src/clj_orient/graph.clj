@@ -2,20 +2,18 @@
 (ns clj-orient.graph
   (:import (com.orientechnologies.orient.core.db.graph ODatabaseGraphTx
                                                        OGraphVertex OGraphEdge)
-    (com.orientechnologies.orient.core.record.impl ODocument))
-  (:use (yggdrasil audhumla)
-    (clj-orient core)))
+    (com.orientechnologies.orient.core.record.impl ODocument)
+    (com.orientechnologies.orient.client.remote OServerAdmin))
+  (:use (clj-orient core)))
 
 ;(set! *warn-on-reflection* true)
 
-;(def *db* (create-graph-db! :memory "bazdb"))
 (defn create-graph-db!
-  [db-loc dbpath]
-  (switch db-loc
-    :local (.create (ODatabaseGraphTx. (str "local:" dbpath)))
-    :memory (.create (ODatabaseGraphTx. (str "memory:" dbpath)))
-    ;:remote (-> (OServerAdmin. (str "remote:" dbpath)) .connect (.createDatabase nil))
-    ))
+  "Given the DBs location as either :local, :remote or :memory and the path, creates the desired DB."
+  ([db-loc dbpath]
+   (.create (ODatabaseGraphTx. (str (name db-loc) ":" dbpath))))
+  ([db-loc dbpath storage]
+   (-> (OServerAdmin. (str "remote:" dbpath)) .connect (.createDatabase (name storage)))))
 
 (defn open-graph-db!
 "Given the DBs location as either :local, :remote or :memory and the path (with optional admin and password data), opens
@@ -51,8 +49,3 @@ the desired DB."
 (defn get-root
   [#^ODatabaseGraphTx db root-name]
   (.getRoot db root-name))
-
-
-
-
-

@@ -9,7 +9,8 @@
     (com.orientechnologies.orient.core.record.impl ODocument)
     (com.orientechnologies.orient.client.remote OServerAdmin)
     (com.orientechnologies.orient.core.id ORecordId ORID)
-    (com.orientechnologies.orient.core.db.graph OGraphVertex)
+    (com.orientechnologies.orient.core.db.graph OGraphElement)
+    (com.orientechnologies.orient.core.metadata.schema OClass)
     ))
 
 ;(set! *warn-on-reflection* true)
@@ -22,7 +23,13 @@
 
 (defn open-document-db!
   [db-loc dbpath user pass]
-  (-> (ODatabaseDocumentTx. (str (name db-loc) ":" dbpath)) (.open user pass)))
+  ;(let [db (ODatabaseDocumentTx. (str (name db-loc) ":" dbpath))]
+  ;  (if (.exists db)
+  ;    (.open db user pass)))
+  (-> (ODatabaseDocumentTx. (str (name db-loc) ":" dbpath)) (.open user pass))
+  )
+
+(defn close-db! [#^ODatabase db] (.close db))
 
 (defn document
 "Returns a newly created document given the database and the document's class (as a String). It can optionally take a regular
@@ -39,17 +46,20 @@ hash-map to set the document's fields."
 
 (defn get-rid
   [record]
-  (let [record (if (instance? OGraphVertex record) (.getDocument record) record)
+  (let [record (if (instance? OGraphElement record) (.getDocument record) record)
         rid (.getIdentity record)]
     [(.getClusterId rid) (.getClusterPosition rid)]))
 
-(defn to-map
+(defn field-names [doc] (seq (.fieldNames doc)))
+(defn field ([doc field] (.field doc (name field))) ([doc field val] (.field doc (name field) val)))
+
+(defn doc->map
   [d]
   (cond
     (instance? ODocument d) (with-meta
                               (apply hash-map (flatten (for [f (.fieldNames d)] [(keyword f) (.field d f)])))
                               {:rid (get-rid d) :class-name (keyword (.getClassName d))})
-    (instance? OGraphVertex d) (recur (.getDocument d))))
+    (instance? OGraphElement d) (recur (.getDocument d))))
 
 (defn browse-class
   [#^ODatabaseDocumentTx db clss]
@@ -89,26 +99,18 @@ hash-map to set the document's fields."
 "Runs the following forms inside a transaction for the given DB. It will return 'true' if all went well and 'false' if the
 transaction failed."
   [db & forms]
-  `(try (.begin ~db) ~@forms (.commit ~db) true
-     (catch Exception e# (.printStackTrace e#) (.rollback ~db) false)))
+  `(try (.begin ~db) (let [r# (do ~@forms)] (.commit ~db) r#)
+     (catch Exception e# (.rollback ~db) (throw e#))))
 
 (defn get-class [#^ODatabase db clss] (-> db .getMetadata .getSchema (.getClass (name clss))))
 
+(defn get-class-name [odoc]
+  (cond
+    (instance? OClass odoc) (.getName odoc)
+    (instance? ODocument odoc) (.getClassName odoc)
+    (instance? OGraphElement odoc) (get-class-name (.getDocument odoc))))
+
 (defn get-classes [#^ODatabaseComplex db] (map identity (-> db .getMetadata .getSchema .classes)))
-
-(defn create-class!
-"Creates a class in the given database and makes it inherit the given superclass. Superclass can be of type String, Class
-or OClass."
-  ([#^ODatabaseComplex db class-name]
-    (-> db .getMetadata .getSchema (.createClass (name class-name)))
-    (-> db .getMetadata .getSchema .save))
-  ([#^ODatabaseComplex db class-name superclass]
-   (if (keyword? superclass)
-     (-> db .getMetadata .getSchema (.createClass (name class-name)) (.setSuperClass (get-class superclass)))
-     (-> db .getMetadata .getSchema (.createClass (name class-name)) (.setSuperClass superclass)))
-   (-> db .getMetadata .getSchema .save)))
-
-(defn close-db! [#^ODatabase db] (.close db))
 
 (defn closed? [#^ODatabase db] (.isClosed db))
 
@@ -127,7 +129,7 @@ or OClass."
   [odoc hmap]
   (cond
     (instance? ODocument odoc) (doall (for [k (keys hmap)] (.field odoc (name k) (hmap k))))
-    (instance? OGraphVertex odoc) (doall (for [k (keys hmap)] (.set odoc (name k) (hmap k)))))
+    (instance? OGraphElement odoc) (doall (for [k (keys hmap)] (.set odoc (name k) (hmap k)))))
   (save! odoc))
 
 (defn derive!
@@ -136,6 +138,20 @@ or OClass."
         superclass (if (keyword? superclass) (get-class db superclass) superclass)]
     (.setSuperClass subclass superclass)
     (-> db .getMetadata .getSchema .save)))
+
+(defn create-class!
+"Creates a class in the given database and makes it inherit the given superclass. Superclass can be of type String, Class
+or OClass."
+  ([#^ODatabaseComplex db class-name]
+    (-> db .getMetadata .getSchema (.createClass (name class-name)))
+    (-> db .getMetadata .getSchema .save))
+  ([#^ODatabaseComplex db class-name superclass]
+   ;(if (keyword? superclass)
+   ;  (-> db .getMetadata .getSchema (.createClass (name class-name)) (.setSuperClass (get-class superclass)))
+   ;  (-> db .getMetadata .getSchema (.createClass (name class-name)) (.setSuperClass superclass)))
+   ;(-> db .getMetadata .getSchema .save)
+   (create-class! db class-name)
+   (derive! db class-name superclass)))
 
 (defn superclass? [#^ODatabase db, superclass, subclass]
   (let [subclass (if (keyword? subclass) (get-class db subclass) subclass)

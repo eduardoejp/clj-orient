@@ -2,19 +2,27 @@
 (ns clj-orient.sql
   #^{:doc "This namespace implements the SQL interface for OrientDB."
      :author "Eduardo Emilio Julián Pereyra"}
-  (:import (com.orientechnologies.orient.core.sql.query OSQLSynchQuery)
+  (:import (java.util HashMap)
+    (com.orientechnologies.orient.core.sql.query OSQLSynchQuery)
     (com.orientechnologies.orient.core.sql OCommandSQL)
     (com.orientechnologies.orient.core.db.graph ODatabaseGraphTx)))
 
-(defn query
-  [db qry]
-  (seq (if (instance? ODatabaseGraphTx db)
-         (->> (OSQLSynchQuery. qry) (.query (.getUnderlying db)))
-         (->> (OSQLSynchQuery. qry) (.query db)))))
+(defn run-query
+  ([db qry limit args]
+    (let [params (HashMap.)]
+      (doall (for [k (keys args)] (.put params (name k) (get args k))))
+      (-> (.command db (OSQLSynchQuery. qry limit)) (.execute (to-array args)))))
+  ([db qry extra]
+   (let [params (HashMap.)]
+     (when (map? extra) (doall (for [k (keys extra)] (.put params (name k) (get extra k)))))
+     (cond
+       (integer? extra) (-> (.command db (OSQLSynchQuery. qry extra)) (.execute (to-array nil)))
+       (seq? extra) (-> (.command db (OSQLSynchQuery. qry)) (.execute (to-array extra)))
+       (map? extra) (-> (.command db (OSQLSynchQuery. qry)) (.execute (to-array [params]))))
+     ))
+  ([db qry] (-> (.command db (OSQLSynchQuery. qry)) (.execute (to-array nil)))))
 
-(defn run-command!
-  [db comm]
-  (->> (OCommandSQL. comm) (.command db) .execute))
+(defn run-command! [db comm] (-> (.command db (OCommandSQL. comm)) (.execute (to-array nil))))
 
 (defmacro defsqlfn
   [sym argsv syntax & forms]
@@ -32,3 +40,4 @@
                        `(~'execute [~'*record* ~'*args*] ~cnd))
                      `(~'execute [~'*record* ~'*args*] ~@forms)))]
      (-> com.orientechnologies.orient.core.sql.OSQLEngine/getInstance (.registerFunction ~(name sym) sqlfn#))))
+

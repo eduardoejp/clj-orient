@@ -12,7 +12,13 @@
 
 (defn open-graph-db!
   [db-loc dbpath user pass]
-  (-> (ODatabaseGraphTx. (str (name db-loc) ":" dbpath)) (.open user pass)))
+  (let [db (ODatabaseObjectTx. (str (name db-loc) ":" dbpath))]
+    (if (.exists db)
+      (-> (ODatabaseGraphTx. (str (name db-loc) ":" dbpath)) (.open user pass))
+      (do (if (= :remote db-loc)
+            (create-db! db-loc dbpath :local)
+            (create-db! db-loc dbpath))
+        (-> (ODatabaseGraphTx. (str (name db-loc) ":" dbpath)) (.open user pass))))))
 
 (defn browse-vertexes [#^ODatabaseGraphTx db] (seq (.browseVertexes db)))
 

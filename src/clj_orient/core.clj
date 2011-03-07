@@ -87,14 +87,12 @@ hash-map to set the document's fields."
   ([dc] (.save dc))
   ([dc clusname] (.save dc clusname)))
 
-(defn update!
-  [odoc hmap]
+(defn update! [odoc hmap]
   (cond
     (instance? ODocument odoc) (doall (for [k (keys hmap)] (.field odoc (name k) (hmap k))))
     (instance? OGraphElement odoc) (doall (for [k (keys hmap)] (.set odoc (name k) (hmap k))))))
 
-(defn get-rid
-  [record]
+(defn get-rid [record]
   (let [record (if (instance? OGraphElement record) (.getDocument record) record)
         rid (.getIdentity record)]
     [(.getClusterId rid) (.getClusterPosition rid)]))
@@ -102,8 +100,7 @@ hash-map to set the document's fields."
 (defn field-names [doc] (seq (.fieldNames doc)))
 (defn field ([doc field] (.field doc (name field))) ([doc field val] (.field doc (name field) val)))
 
-(defn doc->map
-  [d]
+(defn doc->map [d]
   (cond
     (instance? ODocument d) (with-meta
                               (apply hash-map (flatten (for [f (.fieldNames d)] [(keyword f) (.field d f)])))
@@ -112,13 +109,7 @@ hash-map to set the document's fields."
 
 (defn as-ORID [rid] (ORecordId. (first rid) (second rid)))
 
-(defn load-item
-  [db item]
-  (if (vector? item)
-    (.load db #^ORID (as-ORID item))
-    (.load db item))
-  ;(if (instance? ODatabaseDocumentTx db) (recur (.getUnderlying db) item))
-  )
+(defn load-item [db item] (if (vector? item) (.load db #^ORID (as-ORID item)) (.load db item)))
 
 (defn delete!
   ([d] (.delete d))
@@ -176,6 +167,7 @@ or OClass."
 
 ;Native Queries
 (defn native-query [db clss fltr]
-  (proxy [com.orientechnologies.orient.core.query.nativ.ONativeSynchQuery]
-    [db (name clss) (OQueryContextNativeSchema.)]
-    (filter [*record*] (fltr *record*))))
+  (let [qry (proxy [com.orientechnologies.orient.core.query.nativ.ONativeSynchQuery]
+              [db, (name clss), (OQueryContextNativeSchema.)]
+              (filter [*record*] (fltr *record*)))]
+    (.query db qry (to-array nil))))

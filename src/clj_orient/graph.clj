@@ -1,98 +1,96 @@
 
 (ns clj-orient.graph
-  #^{:doc "This namespace implements the graph oriented part of the DB."
-     :author "Eduardo Emilio Julián Pereyra"}
-  (:import (com.orientechnologies.orient.core.db.graph ODatabaseGraphTx
-                                                       OGraphElement OGraphVertex OGraphEdge)
-    (com.orientechnologies.orient.core.record.impl ODocument)
-    (com.orientechnologies.orient.client.remote OServerAdmin))
+  "This namespace wraps the GraphDB part of OrientDB."
+  (:import (com.orientechnologies.orient.core.db.graph OGraphDatabase))
   (:use (clj-orient core)))
 
-;(set! *warn-on-reflection* true)
+(defn open-graph-db! "Opens a new OGraphDatabase and binds it to the *db* var. It then returns the OGraphDatabase."
+  [db-loc user pass]
+  (set-db! (.open (OGraphDatabase. db-loc) user pass))
+  *db*)
 
-(defn open-graph-db!
-  [db-loc dbpath user pass]
-  (let [db (ODatabaseObjectTx. (str (name db-loc) ":" dbpath))]
-    (if (.exists db)
-      (-> (ODatabaseGraphTx. (str (name db-loc) ":" dbpath)) (.open user pass))
-      (do (if (= :remote db-loc)
-            (create-db! db-loc dbpath :local)
-            (create-db! db-loc dbpath))
-        (-> (ODatabaseGraphTx. (str (name db-loc) ":" dbpath)) (.open user pass))))))
+(defn browse-vertices "" [] (.browseVertices *db*))
+(defn browse-edges "" [] (.browseEdges *db*))
+(defn browse-elements "" [] (.browseElements *db*))
 
-(defn browse-vertexes [#^ODatabaseGraphTx db] (seq (.browseVertexes db)))
+(defn count-vertices "" [] (.countVertexes *db*))
+(defn count-edges "" [] (.countEdges *db*))
 
-(defn vertex
-  ([#^ODatabaseGraphTx db] (OGraphVertex. db))
-  ([#^ODatabaseGraphTx db, d]
+(defn make-vertex ""
+  ([] (.createVertex *db*))
+  ([kclass-or-doc]
     (cond
-      (instance? ODocument d) (OGraphVertex. db d)
-      (keyword? d) (OGraphVertex. db (name d))
-      (map? d) (let [vtx (OGraphVertex. db)] (doall (for [k (keys d)] (.set vtx (name k) (d k)))) vtx)))
-  ([#^ODatabaseGraphTx db dclass m]
-   (let [vtx (OGraphVertex. db (name dclass))]
-     (doall (for [k (keys m)] (.set vtx (name k) (m k))))
-     vtx)))
+      (keyword? kclass-or-doc) (.createVertex *db* (name kclass-or-doc))
+      (map? kclass-or-doc) (update! (.createVertex *db*) kclass-or-doc)))
+  ([kclass odoc] (let [vtx (make-vertex kclass)] (update! vtx odoc) vtx)))
 
-(defn add-root!
-  [#^ODatabaseGraphTx db root-name #^OGraphVertex v]
-  (.setRoot db (name root-name) v))
+(defn get-root "" [root-name] (.getRoot *db* (name root-name)))
 
-(defn get-root [#^ODatabaseGraphTx db root-name] (.getRoot db (name root-name)))
+(defn add-root! "" [root-name vertex] (.setRoot *db* (name root-name) vertex))
 
 (defn link!
-  ([#^OGraphVertex n1 #^OGraphVertex n2]
-   (.link n1 n2))
-  ([#^OGraphVertex n1 edge-data #^OGraphVertex n2]
-   (if (keyword? edge-data)
-     (.link n1 n2 (name edge-data))
-     (let [edg (.link n1 n2)]
-       (doall (for [k (keys edge-data)] (.set edg (name k) (get edge-data k))))
-       edg)))
-  ([#^OGraphVertex n1 edge-type props #^OGraphVertex n2]
-   (let [edg (.link n1 n2 (name edge-type))]
-     (doall (for [k (keys props)] (.set edg (name k) (props k))))
-     edg)))
-
-(defn unlink!
-  ([#^ODatabaseGraphTx db #^ODocument n1 #^ODocument n2] (OGraphVertex/unlink db n1 n2))
-  ([#^OGraphVertex n1 #^OGraphVertex n2] (.unlink n1 n2)))
-
-(defn linked?
-  ([n1 n2]
-    (if (or (some #(= (.getIn %) n2) (.getOutEdges n1))
-          (some #(= (.getIn %) n1) (.getOutEdges n2)))
-      true false))
-  ([n1 edgtype n2]
-    (if (or (some #(and (= (.getIn %) n2) (= (get-class-name %) (name edgtype))) (.getOutEdges n1))
-          (some #(and (= (.getIn %) n1) (= (get-class-name %) (name edgtype))) (.getOutEdges n2)))
-      true false))
-  ([n1 edgtype direction n2]
+"Creates an edge between 2 vertexes. An optional edge-type (as a :keyword), ODocument or hash-map can be passed to set the
+type and properties."
+  ([v1 v2] (.createEdge *db* v1 v2))
+  ([v1 edge-data v2]
    (cond
-     (= :-> direction) (if (some #(and (= (.getIn %) n2) (= (get-class-name %) (name edgtype))) (.getOutEdges n1)) true false)
-     (= :<- direction) (if (some #(and (= (.getIn %) n1) (= (get-class-name %) (name edgtype))) (.getOutEdges n2)) true false)))
-  )
+     (keyword? edge-data) (.createEdge *db* v1 v2 (name edge-data))
+     (map? edge-data) (update! (.createEdge *db* v1 v2) edge-data)))
+  ([v1 edge-type props v2] (update! (.createEdge *db* v1 v2 (name edge-type)) props)))
 
-(defn get-edges
-  ([vertex dir] (case dir :in (.getInEdges vertex), :out (.getOutEdges vertex), :both (concat (.getInEdges vertex) (.getOutEdges vertex))))
-  ([vertex dir data]
-    (let [edges (get-edges vertex dir)]
-      (if (keyword? data)
-        (filter #(= (name data) (get-class-name %)) edges)
-        (filter #(reduce (fn [b1 b2] (and b1 b2)) (for [k (keys data)] (= (field % k) (get k data)))) edges)))))
+(defn remove-vertex "" [vertex] (.removeVertex *db* vertex))
+(defn remove-edge! "" [edge] (.removeEdge *db* edge))
 
-(defn get-vertex [edge dir] (case dir :in (.getIn edge), :out (.getOut edge)))
+(defn get-links ""
+  ([v1 v2] (.getEdgesBetweenVertexes v1 v2))
+  ([v1 v2 labels] (.getEdgesBetweenVertexes v1 v2 (to-array labels)))
+  ([v1 v2 labels edge-types] (.getEdgesBetweenVertexes v1 v2 (to-array labels) (to-array (map keyword edge-types)))))
+
+(defn linked? "Returns whether 2 vertexes are linked."
+  [v1 v2] (not (.isEmpty (get-links v1 v2))))
+
+(defn unlink "Removes all the edges between 2 vertices"
+  [v1 v2] (doall (for [e (get-links v1 v2)] (remove-edge! e))))
+
+(defn get-edges "Gets the :in edges, the :out edges or :both edges from a vertex."
+  ([vertex dir] (case dir :in (.getInEdges *db* vertex), :out (.getOutEdges *db* vertex), :both (concat (.getInEdges *db* vertex) (.getOutEdges *db* vertex))))
+  ([vertex dir label-or-hmap]
+    (if (keyword? label-or-hmap)
+      (case dir
+        :in (.getInEdges *db* vertex (name label-or-hmap)),
+        :out (.getOutEdges *db* vertex (name label-or-hmap)),
+        :both (concat (.getInEdges *db* vertex (name label-or-hmap)) (.getOutEdges *db* vertex (name label-or-hmap))))
+      (filter #(reduce (fn [b1 b2] (and b1 b2)) (for [k (keys label-or-hmap)] (= (pget % k) (get label-or-hmap k))))
+        (get-edges vertex dir))))
+  ([vertex dir label hmap]
+    (filter #(reduce (fn [b1 b2] (and b1 b2)) (for [k (keys label hmap)] (= (pget % k) (get label hmap k))))
+      (get-edges vertex dir label))))
+
+(defn get-vertex "Gets th :in or the :out vertex of an edge."
+  [edge dir] (case dir :in (.getInVertex *db* edge), :out (.getOutVertex *db* edge)))
 
 (defn get-ends
+  "Gets the :in edges, the :out edges or :both edges from a vertex."
   ([vertex dir]
    (if (= :both dir)
      (concat (get-ends vertex :in) (get-ends vertex :out))
      (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir))))
-  ([vertex dir data]
+  ([vertex dir label-or-hmap]
    (if (= :both dir)
-     (concat (get-ends vertex :in data) (get-ends vertex :out data))
-     (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir data)))))
+     (concat (get-ends vertex :in label-or-hmap) (get-ends vertex :out label-or-hmap))
+     (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir label-or-hmap))))
+  ([vertex dir label hmap]
+   (if (= :both dir)
+     (concat (get-ends vertex :in label hmap) (get-ends vertex :out label hmap))
+     (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir label hmap)))))
 
+(defn create-vertex-type ""
+  ([ktype] (.createVertexType *db* (name ktype)))
+  ([ktype superclass] (.createVertexType *db* (name ktype) (if (keyword? superclass) (name superclass) superclass))))
 
+(defn create-edge-type ""
+  ([ktype] (.createEdgeType *db* (name ktype)))
+  ([ktype superclass] (.createEdgeType *db* (name ktype) (if (keyword? superclass) (name superclass) superclass))))
 
-
+(defn get-vertex-base-class "" [] (.getVertexBaseClass *db*))
+(defn get-edge-base-class "" [] (.getEdgeBaseClass *db*))

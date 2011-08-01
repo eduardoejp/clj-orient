@@ -46,8 +46,8 @@
   ([kclass-or-map]
     (cond
       (keyword? kclass-or-map) (.createVertex *db* (name kclass-or-map))
-      (map? kclass-or-map) (update! (.createVertex *db*) kclass-or-map)))
-  ([kclass hmap] (let [vtx (vertex kclass)] (update! vtx hmap) vtx)))
+      (map? kclass-or-map) (apply passoc! (.createVertex *db*) (mapcat identity kclass-or-map))))
+  ([kclass hmap] (let [vtx (vertex kclass)] (apply passoc! vtx (mapcat identity hmap)) vtx)))
 
 (defn remove-vertex! "" [vertex] (.removeVertex *db* vertex))
 
@@ -72,8 +72,8 @@
   ([v1 edge-data v2]
    (cond
      (keyword? edge-data) (.createEdge *db* v1 v2 (name edge-data))
-     (map? edge-data) (update! (.createEdge *db* v1 v2) edge-data)))
-  ([v1 edge-type props v2] (update! (link! v1 (name edge-type) v2) props)))
+     (map? edge-data) (apply passoc! (.createEdge *db* v1 v2) (mapcat identity edge-data))))
+  ([v1 edge-type props v2] (apply passoc! (link! v1 (name edge-type) v2) (mapcat identity props))))
 
 (defn remove-edge! "" [edge] (.removeEdge *db* edge))
 

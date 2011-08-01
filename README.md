@@ -27,6 +27,7 @@ Examples
 --------
 
 Working with the database:
+
 	; Opening the database as a document DB
 	; Opens the database and binds the database object to the *db* var with which most functions in the library work.
 	; There are variants of this function for the graph-db and object-db.
@@ -56,22 +57,26 @@ Working with the database:
 		(form-n ...))
 
 Working with documents:
+
 	(let [u (document :user {:first-name "Foo", :last-name "Bar", :age 10})
 		    u (passoc! u :first-name "Mr. Foo", :age 10)]
 		(println (doc->map u))
 		(save! u))
 
 Working with classes:
+
 	(get-class :user)
 	(derive! :user (get-vertex-base-class))
 	(create-class! :knows (get-edge-base-class))
 
 Working with the graph-db:
+
 	(let [a (save! (vertex :user {:first-name "John", :last-name "Doe", :age 20}))
 		    b (save! (vertex :user {:first-name "Jane", :last-name "Doe", :age 25}))]
 		(save! (link! a :knows {:since "2011/8/1"} b)))
 
 Querying a Database:
+
 	(native-query :user {:country "USA", :age [:$>= 20], :name [:$matches "John%"]})
 
 	(sql-query "SELECT FROM user WHERE country = :country AND age >= :age AND name MATCHES :name"
@@ -79,6 +84,7 @@ Querying a Database:
 		         100)
 
 Hooks:
+
 	(defhook my-hook
 		(after-create [document]
 		  (println "Created new document:" (doc->map document))))

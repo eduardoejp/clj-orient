@@ -7,9 +7,9 @@
             :comments "same as Clojure"}
   :dependencies [[org.clojure/clojure "1.2.0"]
                  [org.clojure/clojure-contrib "1.2.0"]
-                 [com.orientechnologies/orient-commons "1.0rc2-SNAPSHOT"]
-                 [com.orientechnologies/orientdb-core "1.0rc2-SNAPSHOT"]
-                 [com.orientechnologies/orientdb-client "1.0rc2-SNAPSHOT"]]
+                 [com.orientechnologies/orient-commons "1.0rc3-SNAPSHOT"]
+                 [com.orientechnologies/orientdb-core "1.0rc3-SNAPSHOT"]
+                 [com.orientechnologies/orientdb-client "1.0rc3-SNAPSHOT"]]
   :dev-dependencies [[org.clojars.rayne/autodoc "0.8.0-SNAPSHOT"]]
   :repositories {"orient" "http://www.orientechnologies.com/listing/m2"}
   :autodoc {:name "clj-orient"

@@ -10,7 +10,7 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns #^{:author "Eduardo Julián",
+(ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
        :doc "This namespace wraps the querying functionality, both for native queries and SQL queries."}
   clj-orient.query
   (:use (clj-orient core))
@@ -35,22 +35,38 @@
     (.eq d v)))
 
 (defn- map->nquery [qdoc kvs]
-  (.go (reduce (fn [d [k v]]
-                 (let [d (.field d (name k))
-                       d (if (vector? v)
-                           (_special-cases d v)
-                           (.eq d v))]
-                   (.and d)))
-               qdoc kvs)))
+  (reduce (fn [d [k v]]
+            (let [d (.field d (name k))
+                  d (if (vector? v)
+                      (_special-cases d v)
+                      (.eq d v))]
+              (.and d)))
+          qdoc kvs))
 
 (defn native-query
-  "Executes a native query that filters results by the class of the documents (as a keyword) and a filtering function."
+  "Executes a native query that filters results by the class of the documents (as a keyword) and a filtering function.
+
+When provided a filtering function, you will have to make your own query using the available Java methods
+for the OQueryContextNativeSchema instance you will be given.
+
+When provided a hash-map, matching will be done like this:
+{:field1 val1
+ :field2 [<command> val2]}
+e.g.
+{:country \"USA\",
+ :age [:$>= 20]
+ :last-name [:$not= \"Smith\"]}
+
+Available commands:
+:$=, :$not=, :$<, :$<=, :$>, :$>=, :$like, :$matches
+
+When not provided a command, it works like :$= (equal)."
   [kclass filter-fn]
   (let [qry (proxy [com.orientechnologies.orient.core.query.nativ.ONativeSynchQuery]
               [*db*, (name kclass), (OQueryContextNativeSchema.)]
-              (filter [*record*] (if (map? filter-fn)
-                                   (map->nquery *record* filter-fn)
-                                   (filter-fn *record*))))]
+              (filter [*record*] (.go (if (map? filter-fn)
+                                        (map->nquery *record* filter-fn)
+                                        (filter-fn *record*)))))]
     (seq (.query *db* qry (to-array nil)))))
 
 ; SQL Queries
@@ -65,7 +81,9 @@
     (or (vector? args) (seq? args)) args))
 
 (defn sql-query
-  "Runs the given SQL query with the given parameters (as a Clojure hash-map) and with the given limit."
+  "Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and with the given limit.
+When using positional parameters (?), use a vector.
+When using named parameter (:named), use a hash-map."
   ([qry args limit] (-> *db* (.command (OSQLSynchQuery. qry limit)) (.execute (to-array (prep-args args))) seq))
   ([qry extra]
    (if (integer? extra)

@@ -10,7 +10,7 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns #^{:author "Eduardo Julián",
+(ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
        :doc "This namespace wraps the basic OrientDB API functionality and all the DocumentDB functionality."}
   clj-orient.core
   (:import (com.orientechnologies.orient.client.remote OServerAdmin)
@@ -105,12 +105,6 @@
                 (.save *db* document)))
   ([document kcluster] (.save document kcluster)))
 
-(defn update!
-  "Updates an ODocument based on the given hash-map."
-  [document hmap]
-  (dorun (for [[k v] hmap] (.field document (name k) v)))
-  document)
-
 (defn get-id "Returns the ORecordId for the given document or graph element."
   [record] (.getIdentity record))
 
@@ -125,7 +119,12 @@
 
 (defn pget "" [document key] (.field document (name key)))
 
-(defn passoc! "" [document key val] (.field document (name key) val))
+(defn passoc! ""
+  ([document key val]
+   (.field document (name key) val)
+   document)
+  ([document key val & kvs]
+   (apply passoc! (passoc! document key val) kvs)))
 
 (defn doc->map
   "Given an ODocument, returns a hash-map of its keys and values."
@@ -162,11 +161,13 @@
 (defn create-class!
   "Creates a class in the given database and makes it inherit the given superclass. Superclass can be of type String, Class or OClass."
   ([kclass]
-    (-> *db* .getMetadata .getSchema (.createClass (name kclass)))
-    (-> *db* .getMetadata .getSchema .save))
+   (let [oclass (-> *db* .getMetadata .getSchema (.createClass (name kclass)))]
+     (-> *db* .getMetadata .getSchema .save)
+     oclass))
   ([kclass ksuperclass]
-   (create-class! *db* kclass)
-   (derive! *db* kclass ksuperclass)))
+   (let [oclass (create-class! *db* kclass)]
+     (derive! *db* kclass ksuperclass)
+     oclass)))
 
 (defn drop-class! ""
   [kclass]
@@ -200,6 +201,7 @@
 (defn get-hooks "" [] (seq (.getHooks *db*)))
 (defn add-hook! "" [hook] (.registerHook *db* hook))
 (defn remove-hook! "" [hook] (.unregisterHook *db* hook))
+
 (defmacro defhook
   "Creates a new hook from the following fn definitions (each one is optional):
   (before-create [~document] ~@forms)
@@ -212,11 +214,12 @@
   (after-delete [~document] ~@forms)
 Example:
 (defhook log-hook
-  (after-create document (println \"Created:\" (doc->map document))))
+  (after-create [document] (println \"Created:\" (doc->map document))))
 
-defhook only creates the hook. To add it to the current *db* use add-hook.
-"
+defhook only creates the hook. To add it to the current *db* use add-hook."
   [sym & triggers]
-  `(def ~sym
-     (proxy [com.orientechnologies.orient.core.hook.ORecordHookAbstract] []
-       ~@(for [[meth args & forms] triggers] `(~(get +triggers+ meth) ~args ~@forms)))))
+  (let [doc-string (when (string? (first triggers)) (first triggers))
+        triggers (if (string? (first triggers)) (rest triggers) triggers)]
+    `(def ~(with-meta sym {:doc doc-string})
+       (proxy [com.orientechnologies.orient.core.hook.ORecordHookAbstract] []
+         ~@(for [[meth args & forms] triggers] `(~(get +triggers+ meth) ~args ~@forms))))))

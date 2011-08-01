@@ -10,7 +10,7 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns #^{:author "Eduardo Julián",
+(ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
        :doc "This namespace wraps the ObjectDB part of OrientDB."}
   clj-orient.object
   (:import (com.orientechnologies.orient.core.db.object ODatabaseObjectTx))
@@ -19,10 +19,10 @@
 (defopener open-object-db! ODatabaseObjectTx
   "Opens a new ODatabaseObjectTx and binds it to the *db* var. It then returns the ODatabaseObjectTx.")
 
-(defn register-entity-classª "" [class]
+(defn register-entity-class! "" [class]
   (-> *db* .getEntityManager (.registerEntityClass class)))
 
-(defn register-entity-classesª "" [package]
+(defn register-entity-classes! "" [package]
   (-> *db* .getEntityManager (.registerEntityClasses package)))
 
 (defn save-only-dirty! "" [?] (.setSaveOnlyDirty *db* ?))

@@ -10,7 +10,7 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns #^{:author "Eduardo Julián",
+(ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
        :doc "This namespace wraps the GraphDB part of OrientDB."}
   clj-orient.graph
   (:import (com.orientechnologies.orient.core.db.graph OGraphDatabase))
@@ -88,7 +88,7 @@
   [v1 v2] (not (empty? (get-links v1 v2))))
 
 (defn unlink! "Removes all the edges between 2 vertices"
-  [v1 v2] (dorun (map #(remove-edge! %) (get-links v1 v2))))
+  [v1 v2] (dorun (map remove-edge! (get-links v1 v2))))
 
 (defn get-vertex "Gets the :in or the :out vertex of an edge."
   [edge dir] (case dir :in (.getInVertex *db* edge), :out (.getOutVertex *db* edge)))
@@ -98,29 +98,34 @@
                   :in (set (.getInEdges *db* vertex)),
                   :out (set (.getOutEdges *db* vertex)),
                   :both (set/union (get-edges vertex :in) (get-edges vertex :out))))
-  ([vertex dir ktype-or-hmap]
+  ([vertex dir kclass-or-hmap]
    (if (= :both dir)
-     (set/union (get-edges vertex :in ktype-or-hmap) (get-edges vertex :out ktype-or-hmap))
-     (if (keyword? ktype-or-hmap)
+     (set/union (get-edges vertex :in kclass-or-hmap) (get-edges vertex :out kclass-or-hmap))
+     (if (keyword? kclass-or-hmap)
        (case dir
-         :in (set (.getInEdges *db* vertex (name ktype-or-hmap))),
-         :out (set (.getOutEdges *db* vertex (name ktype-or-hmap))))
+         :in (set (.getInEdges *db* vertex (name kclass-or-hmap))),
+         :out (set (.getOutEdges *db* vertex (name kclass-or-hmap))))
        (case dir
-         :in (set (.getInEdgesHavingProperties *db* vertex (walk/stringify-keys ktype-or-hmap)))
-         :out (set (.getOutEdgesHavingProperties *db* vertex (walk/stringify-keys ktype-or-hmap)))))
-     )))
+         :in (set (.getInEdgesHavingProperties *db* vertex (walk/stringify-keys kclass-or-hmap)))
+         :out (set (.getOutEdgesHavingProperties *db* vertex (walk/stringify-keys kclass-or-hmap)))))
+     ))
+  ([vertex dir kclass props]
+   (-> (case dir
+         :in (set (.getInEdges *db* vertex (name kclass))),
+         :out (set (.getOutEdges *db* vertex (name kclass))))
+     (#(.filterEdgesByProperties *db* % props)))))
 
 (defn get-ends
-  "Gets the :in edges, the :out edges or :both edges from a vertex."
+  "Gets the vertices at the end of the :in edges, the :out edges or :both edges from a vertex."
   ([vertex dir]
    (if (= :both dir)
      (concat (get-ends vertex :in) (get-ends vertex :out))
      (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir))))
-  ([vertex dir ktype-or-hmap]
+  ([vertex dir kclass-or-hmap]
    (if (= :both dir)
-     (concat (get-ends vertex :in ktype-or-hmap) (get-ends vertex :out ktype-or-hmap))
-     (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir ktype-or-hmap))))
-  ([vertex dir ktype hmap]
+     (concat (get-ends vertex :in kclass-or-hmap) (get-ends vertex :out kclass-or-hmap))
+     (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir kclass-or-hmap))))
+  ([vertex dir kclass hmap]
    (if (= :both dir)
-     (concat (get-ends vertex :in ktype hmap) (get-ends vertex :out ktype hmap))
-     (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir ktype hmap)))))
+     (concat (get-ends vertex :in kclass hmap) (get-ends vertex :out kclass hmap))
+     (map #(get-vertex % (case dir :in :out, :out :in)) (get-edges vertex dir kclass hmap)))))

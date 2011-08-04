@@ -14,15 +14,14 @@
        :doc "This namespace wraps the querying functionality, both for native queries and SQL queries."}
   clj-orient.query
   (:use (clj-orient core))
-  (:import (com.orientechnologies.orient.core.query.nativ ONativeSynchQuery OQueryContextNativeSchema)
-    (java.util HashMap)
+  (:import (java.util HashMap)
+    (com.orientechnologies.orient.core.query.nativ ONativeSynchQuery OQueryContextNativeSchema)
     (com.orientechnologies.orient.core.sql.query OSQLSynchQuery)
     (com.orientechnologies.orient.core.sql OCommandSQL)
-    (com.orientechnologies.orient.core.db.graph ODatabaseGraphTx)))
+    (com.orientechnologies.orient.core.db ODatabaseComplex)))
 
 ; Native Queries
-(defn- _special-cases
-  [d v]
+(defn- _special-cases [#^OQueryContextNativeSchema d v]
   (case (first v)
     :$= (.eq d (second v))
     :$not= (.different d (second v))
@@ -35,7 +34,7 @@
     (.eq d v)))
 
 (defn- map->nquery [qdoc kvs]
-  (reduce (fn [d [k v]]
+  (reduce (fn [#^OQueryContextNativeSchema d [k v]]
             (let [d (.field d (name k))
                   d (if (vector? v)
                       (_special-cases d v)
@@ -64,9 +63,9 @@ When not provided a command, it works like :$= (equal)."
   [kclass filter-fn]
   (let [qry (proxy [com.orientechnologies.orient.core.query.nativ.ONativeSynchQuery]
               [*db*, (name kclass), (OQueryContextNativeSchema.)]
-              (filter [*record*] (.go (if (map? filter-fn)
-                                        (map->nquery *record* filter-fn)
-                                        (filter-fn *record*)))))]
+              (filter [*record*] (.go #^OQueryContextNativeSchema (if (map? filter-fn)
+                                                                    (map->nquery *record* filter-fn)
+                                                                    (filter-fn *record*)))))]
     (seq (.query *db* qry (to-array nil)))))
 
 ; SQL Queries
@@ -78,21 +77,35 @@ When not provided a command, it works like :$= (equal)."
 (defn- prep-args [args]
   (cond
     (map? args) [(map->hmap args)]
-    (or (vector? args) (seq? args)) args))
+    (or (vector? args) (seq? args)) args
+    :else args))
+
+(defn- paginate [qry args orid]
+  (try
+    (let [res (.query *db* (OSQLSynchQuery. (str qry " RANGE " orid))
+                      (to-array (prep-args args)))]
+      (when-not (empty? res)
+        (lazy-cat res (paginate qry args (-> res last .getIdentity .next)))))
+    (catch com.orientechnologies.orient.core.exception.OQueryParsingException e
+      '())))
 
 (defn sql-query
   "Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and with the given limit.
 When using positional parameters (?), use a vector.
 When using named parameter (:named), use a hash-map."
-  ([qry args limit] (-> *db* (.command (OSQLSynchQuery. qry limit)) (.execute (to-array (prep-args args))) seq))
-  ([qry extra]
-   (if (integer? extra)
-     (-> *db* (.command (OSQLSynchQuery. qry extra)) (.execute (to-array nil)) seq)
-     (-> *db* (.command (OSQLSynchQuery. qry)) (.execute (to-array (prep-args extra))) seq)))
-  ([qry] (-> *db* (.command (OSQLSynchQuery. qry)) (.execute (to-array nil)) seq)))
+  ([qry args paginate?]
+   (try
+     (let [sqry (OSQLSynchQuery. qry)
+           res (.query *db* sqry (to-array (prep-args args)))]
+       (if paginate?
+         (lazy-cat res (paginate qry args (-> res last .getIdentity .next)))
+         (seq res)))
+     (catch com.orientechnologies.orient.core.exception.OQueryParsingException e
+       '())))
+  ([qry args] (sql-query qry args false)))
 
 (defn run-sql-command! "Runs the given SQL command."
-  [db comm] (-> (.command db (OCommandSQL. comm)) (.execute (to-array nil))))
+  [comm] (-> #^ODatabaseComplex *db* (.command (OCommandSQL. comm))))
 
 (defmacro defsqlfn
   "Defines a new SQL function and installs it on the SQL engine."

@@ -13,74 +13,75 @@
 (ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
        :doc "This namespace wraps the GraphDB part of OrientDB."}
   clj-orient.graph
-  (:import (com.orientechnologies.orient.core.db.graph OGraphDatabase))
+  (:import (com.orientechnologies.orient.core.db.graph OGraphDatabase OGraphDatabasePool))
   (:use (clj-orient core))
   (:require [clojure.walk :as walk]
             [clojure.set :as set]))
 
 ; Graph-DB fns
-(defopener open-graph-db! OGraphDatabase
-  "Opens a new OGraphDatabase and binds it to the *db* var. It then returns the OGraphDatabase.")
+(defopener open-graph-db! OGraphDatabasePool
+  "Opens and returns a new OGraphDatabase.")
 
 (defn browse-vertices ""
-  ([] (iterator-seq (.browseVertices *db*)))
-  ([polymorphic?] (iterator-seq (.browseVertices *db* polymorphic?))))
+  ([] (browse-vertices false))
+  ([polymorphic?] (iterator-seq (.browseVertices #^OGraphDatabase *db* polymorphic?))))
 (defn browse-edges ""
-  ([] (iterator-seq (.browseEdges *db*)))
-  ([polymorphic?] (iterator-seq (.browseEdges *db* polymorphic?))))
-(defn browse-elements "" [kclass polymorphic?] (iterator-seq (.browseElements *db* (name kclass) polymorphic?)))
+  ([] (browse-edges false))
+  ([polymorphic?] (iterator-seq (.browseEdges #^OGraphDatabase *db* polymorphic?))))
+(defn browse-elements "" [kclass polymorphic?] (iterator-seq (.browseElements #^OGraphDatabase *db* (name kclass) polymorphic?)))
 
-(defn count-vertices "" [] (.countVertexes *db*))
-(defn count-edges "" [] (.countEdges *db*))
+(defn count-vertices "" [] (.countVertexes #^OGraphDatabase *db*))
+(defn count-edges "" [] (.countEdges #^OGraphDatabase *db*))
 (defn count-elements "" [] (+ (count-vertices) (count-edges)))
 
 ; Vertices
-(defn get-vertex-base-class "" [] (.getVertexBaseClass *db*))
+(defn get-vertex-base-class "" [] (.getVertexBaseClass #^OGraphDatabase *db*))
 
 (defn create-vertex-type! ""
-  ([kclass] (.createVertexType *db* (name kclass)))
-  ([kclass ksuperclass] (.createVertexType *db* (name kclass) (name ksuperclass))))
+  ([kclass] (.createVertexType #^OGraphDatabase *db* (name kclass)))
+  ([kclass ksuperclass] (.createVertexType #^OGraphDatabase *db* (name kclass) (name ksuperclass))))
 
-(defn vertex ""
-  ([] (.createVertex *db*))
+(defn vertex "Creates a new vertex. Works just like 'document'."
+  ([] (.createVertex #^OGraphDatabase *db*))
   ([kclass-or-map]
     (cond
-      (keyword? kclass-or-map) (.createVertex *db* (name kclass-or-map))
-      (map? kclass-or-map) (apply passoc! (.createVertex *db*) (mapcat identity kclass-or-map))))
+      (keyword? kclass-or-map) (.createVertex #^OGraphDatabase *db* (name kclass-or-map))
+      (map? kclass-or-map) (apply passoc! (.createVertex #^OGraphDatabase *db*) (mapcat identity kclass-or-map))))
   ([kclass hmap] (let [vtx (vertex kclass)] (apply passoc! vtx (mapcat identity hmap)) vtx)))
 
-(defn remove-vertex! "" [vertex] (.removeVertex *db* vertex))
+(defn delete-vertex! "" [vertex] (.removeVertex #^OGraphDatabase *db* vertex))
 
 (defn get-root "Returns the root node of the given name (as a keyword)."
   [root-name]
-  (.getRoot *db* (name root-name)))
+  (.getRoot #^OGraphDatabase *db* (name root-name)))
 
 (defn add-root! "Sets up a root node with the given name (as a keyword)."
   [root-name vertex]
-  (.setRoot *db* (name root-name) vertex))
+  (.setRoot #^OGraphDatabase *db* (name root-name) vertex))
 
 ; Edges
-(defn get-edge-base-class "" [] (.getEdgeBaseClass *db*))
+(defn get-edge-base-class "" [] (.getEdgeBaseClass #^OGraphDatabase *db*))
 
 (defn create-edge-type! ""
-  ([kclass] (.createEdgeType *db* (name kclass)))
-  ([kclass ksuperclass] (.createEdgeType *db* (name kclass) (name ksuperclass))))
+  ([kclass] (.createEdgeType #^OGraphDatabase *db* (name kclass)))
+  ([kclass ksuperclass] (.createEdgeType #^OGraphDatabase *db* (name kclass) (name ksuperclass))))
 
 (defn link!
 "Creates an edge between 2 vertices. An optional edge-type (as a :keyword) or hash-map can be passed to set the type and properties."
-  ([v1 v2] (.createEdge *db* v1 v2))
+  ([v1 v2] (.createEdge #^OGraphDatabase *db* v1 v2))
   ([v1 edge-data v2]
    (cond
-     (keyword? edge-data) (.createEdge *db* v1 v2 (name edge-data))
-     (map? edge-data) (apply passoc! (.createEdge *db* v1 v2) (mapcat identity edge-data))))
+     (keyword? edge-data) (.createEdge #^OGraphDatabase *db* v1 v2 (name edge-data))
+     (map? edge-data) (apply passoc! (.createEdge #^OGraphDatabase *db* v1 v2) (mapcat identity edge-data))))
   ([v1 edge-type props v2] (apply passoc! (link! v1 (name edge-type) v2) (mapcat identity props))))
 
-(defn remove-edge! "" [edge] (.removeEdge *db* edge))
+(defn delete-edge! "" [edge] (.removeEdge #^OGraphDatabase *db* edge))
 
 (defn get-links "Returns the set of edges between 2 vertices."
-  ([v1 v2] (set (.getEdgesBetweenVertexes *db* v1 v2)))
-  ([v1 v2 labels] (set (.getEdgesBetweenVertexes *db* v1 v2 (into-array String (map name labels)))))
-  ([v1 v2 labels edge-types] (set (.getEdgesBetweenVertexes *db* v1 v2
+  ([v1 v2] (set (.getEdgesBetweenVertexes #^OGraphDatabase *db* v1 v2)))
+  ([v1 v2 labels] (set (.getEdgesBetweenVertexes #^OGraphDatabase *db* v1 v2 (into-array String (map name labels)))))
+  ([v1 v2 labels edge-types] (set (.getEdgesBetweenVertexes #^OGraphDatabase *db*
+                                                            v1 v2
                                                             (into-array String (map name labels))
                                                             (into-array String (map name edge-types))))))
 
@@ -88,32 +89,38 @@
   [v1 v2] (not (empty? (get-links v1 v2))))
 
 (defn unlink! "Removes all the edges between 2 vertices"
-  [v1 v2] (dorun (map remove-edge! (get-links v1 v2))))
+  [v1 v2] (dorun (map delete-edge! (get-links v1 v2))))
 
 (defn get-vertex "Gets the :in or the :out vertex of an edge."
-  [edge dir] (case dir :in (.getInVertex *db* edge), :out (.getOutVertex *db* edge)))
+  [edge dir]
+  (case dir
+    :in (.getInVertex #^OGraphDatabase *db* edge)
+    :out (.getOutVertex #^OGraphDatabase *db* edge)))
 
-(defn get-edges "Gets the :in edges, the :out edges or :both edges from a vertex."
+(defn get-edges
+  "Gets the :in edges, the :out edges or :both edges from a vertex.
+If provided properties to filter the edges, the properties can be a vector or a sequence (to filter edges that have the keys in there)
+or a hash-map (to filter edges with properties set to specified values)."
   ([vertex dir] (case dir
-                  :in (set (.getInEdges *db* vertex)),
-                  :out (set (.getOutEdges *db* vertex)),
+                  :in (set (.getInEdges #^OGraphDatabase *db* vertex)),
+                  :out (set (.getOutEdges #^OGraphDatabase *db* vertex)),
                   :both (set/union (get-edges vertex :in) (get-edges vertex :out))))
-  ([vertex dir kclass-or-hmap]
+  ([vertex dir kclass-or-props]
    (if (= :both dir)
-     (set/union (get-edges vertex :in kclass-or-hmap) (get-edges vertex :out kclass-or-hmap))
-     (if (keyword? kclass-or-hmap)
+     (set/union (get-edges vertex :in kclass-or-props) (get-edges vertex :out kclass-or-props))
+     (if (keyword? kclass-or-props)
        (case dir
-         :in (set (.getInEdges *db* vertex (name kclass-or-hmap))),
-         :out (set (.getOutEdges *db* vertex (name kclass-or-hmap))))
+         :in (set (.getInEdges #^OGraphDatabase *db* vertex (name kclass-or-props))),
+         :out (set (.getOutEdges #^OGraphDatabase *db* vertex (name kclass-or-props))))
        (case dir
-         :in (set (.getInEdgesHavingProperties *db* vertex (walk/stringify-keys kclass-or-hmap)))
-         :out (set (.getOutEdgesHavingProperties *db* vertex (walk/stringify-keys kclass-or-hmap)))))
+         :in (set (.getInEdgesHavingProperties #^OGraphDatabase *db* vertex (walk/stringify-keys kclass-or-props)))
+         :out (set (.getOutEdgesHavingProperties #^OGraphDatabase *db* vertex (walk/stringify-keys kclass-or-props)))))
      ))
   ([vertex dir kclass props]
    (-> (case dir
-         :in (set (.getInEdges *db* vertex (name kclass))),
-         :out (set (.getOutEdges *db* vertex (name kclass))))
-     (#(.filterEdgesByProperties *db* % props)))))
+         :in (.getInEdges #^OGraphDatabase *db* vertex (name kclass)),
+         :out (.getOutEdges #^OGraphDatabase *db* vertex (name kclass)))
+     (#(.filterEdgesByProperties #^OGraphDatabase *db* % props)))))
 
 (defn get-ends
   "Gets the vertices at the end of the :in edges, the :out edges or :both edges from a vertex."

@@ -90,9 +90,9 @@ When not provided a command, it works like :$= (equal)."
       '())))
 
 (defn sql-query
-  "Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and with the given limit.
+  "Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and the option to paginate results.
 When using positional parameters (?), use a vector.
-When using named parameter (:named), use a hash-map."
+When using named parameters (:named), use a hash-map."
   ([qry args paginate?]
    (try
      (let [sqry (OSQLSynchQuery. qry)

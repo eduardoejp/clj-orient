@@ -74,10 +74,8 @@
 (defn browse-cluster "Returns a seq of all the documents in the specified cluster."
   [kcluster] (iterator-seq (.browseCluster *db* (name kcluster))))
 
-(defn count-class ""
-  [kclass] (.countClass #^ODatabaseDocumentTx *db* (name kclass)))
-(defn count-cluster ""
-  [id] (.countClusterElements *db* (if (keyword? id) (name id) id)))
+(defn count-class "" [kclass] (.countClass #^ODatabaseDocumentTx *db* (name kclass)))
+(defn count-cluster "" [id] (.countClusterElements *db* (if (keyword? id) (name id) id)))
 
 (defn get-cluster-names "" [] (map keyword (.getClusterNames *db*)))
 (defn get-cluster-name "" [id] (keyword (.getClusterNameById *db* id)))
@@ -160,13 +158,13 @@ It can optionally take a Clojure hash-map to set the document's properties."
    (apply passoc! (passoc! document key val) kvs)))
 
 (defn pdissoc! "Same a 'dissoc', but for document properties."
-  ([#^ODocument document key] (.removeField document key) document)
+  ([#^ODocument document key] (.removeField document (name key)) document)
   ([document key & keys] (reduce pdissoc! document (conj key keys))))
 
 (defn pcontains?
   "Same a 'contains?', but for document properties."
   [#^ODocument document key]
-  (.containsField document key))
+  (.containsField document (name key)))
 
 (defn merge! "Same a 'merge', but for document properties."
   [doc1 doc2]

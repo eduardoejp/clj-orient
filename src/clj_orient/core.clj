@@ -146,7 +146,7 @@ It can optionally take a Clojure hash-map to set the document's properties."
 (defn pget "Same a 'get', but for document properties."
   [#^ODocument document key]
   (let [v (.field document (name key))]
-    (if (and (string? v) (.startsWitch #^String v ":"))
+    (if (and (string? v) (.startsWith #^String v ":"))
       (keyword (.substring #^String v 1))
       v)))
 

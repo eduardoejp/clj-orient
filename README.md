@@ -7,7 +7,7 @@ clj-orient
 Usage
 -----
 
-Simply add this to your leiningen deps: `[clj-orient "0.2.1"]`
+Simply add this to your leiningen deps: `[clj-orient "0.2.2"]`
 
 Documentation
 -------------

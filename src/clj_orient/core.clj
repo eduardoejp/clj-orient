@@ -10,8 +10,8 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
-       :doc "This namespace wraps the basic OrientDB API functionality and all the DocumentDB functionality."}
+(ns ^{:author "Eduardo Julian <eduardoejp@gmail.com>",
+      :doc "This namespace wraps the basic OrientDB API functionality and all the DocumentDB functionality."}
   clj-orient.core
   (:import (com.orientechnologies.orient.client.remote OServerAdmin)
     (com.orientechnologies.orient.core.db ODatabase ODatabaseComplex ODatabasePoolBase)
@@ -20,30 +20,47 @@
     (com.orientechnologies.orient.core.record ORecord)
     (com.orientechnologies.orient.core.record.impl ODocument)
     (com.orientechnologies.orient.core.id ORecordId ORID)
-    (com.orientechnologies.orient.core.metadata.schema OClass OProperty OProperty$INDEX_TYPE)
+    (com.orientechnologies.orient.core.metadata.schema OClass OProperty OClass$INDEX_TYPE)
     (com.orientechnologies.orient.core.hook ORecordHook ORecordHookAbstract)
-    )
-  (:use clojure.contrib.def))
+    ))
+
 
 (declare get-schema save-schema! oclass)
 
 ; Utils
 (defmacro defopener [sym class docstring]
   `(defn ~sym ~docstring [~'db-loc ~'user ~'pass]
-     (-> (. ~class (global)) (.acquire ~'db-loc ~'user ~'pass))))
+     (-> ~class (. (global)) (.acquire ~'db-loc ~'user ~'pass))))
 
 ;;;;;;;;;;;;;;;;;;;
 ;;; DB Handling ;;;
 ;;;;;;;;;;;;;;;;;;;
-(def #^{:doc "This dynamic var holds the current open DB."
-        :tag com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx}
+(def ^{:doc "This dynamic var holds the current open DB.",
+       :tag com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx,
+       :dynamic true}
        *db* nil)
+
+(defn prop-in [x]
+  (cond
+    (keyword? x) (str x)
+    (set? x) (->> x seq (map prop-in))
+    (map? x) (java.util.HashMap. (apply hash-map (interleave (map prop-in (keys x)) (map prop-in (vals x)))))
+    (coll? x) ((if (vector? x) vec seq) (map prop-in x))
+    :else x))
+
+(defn prop-out [x]
+  (cond
+    (and (string? x) (.startsWith x ":")) (keyword (.substring x 1))
+    (set? x) (->> x seq (map prop-out) set)
+    (instance? java.util.HashMap x) (let [x (into {} x)] (apply hash-map (interleave (map prop-out (keys x)) (map prop-out (vals x)))))
+    (coll? x) ((if (vector? x) vec seq) (map prop-out x))
+    :else x))
 
 (defn create-db!
   "Creates a new database either locally or remotely. It does not, however, return the open instance or bind *db*."
   ([db-location]
    (-> (ODatabaseDocumentTx. db-location) .create .close))
-  ([#^String db-location user password]
+  ([^String db-location user password]
    (-> (OServerAdmin. db-location) (.connect user password) (.createDatabase "remote") .close)))
 
 (defn set-db! "Sets *db*'s root binding to the given DB."
@@ -55,11 +72,11 @@
 (defn close-db!
   "Closes the DB at *db* and sets *db* to nil."
   ([] (when *db* (.close *db*) (set-db! nil)))
-  ([#^ODatabase db] (.close db)))
+  ([^ODatabase db] (.close db)))
 
 (defn delete-db! "Deletes the database bound to *db* and sets *db* to nil."
   ([] (.delete *db*) (set-db! nil))
-  ([#^ODatabase db] (.delete db)))
+  ([^ODatabase db] (.delete db)))
 
 (defmacro with-db
   "Evaluates the given forms in an environment where *db* is bound to the given database."
@@ -70,11 +87,11 @@
        x#)))
 
 (defn browse-class "Returns a seq of all the documents of the specified class."
-  [kclass] (iterator-seq (.browseClass #^ODatabaseDocumentTx *db* (name kclass))))
+  [kclass] (iterator-seq (.browseClass ^ODatabaseDocumentTx *db* (name kclass))))
 (defn browse-cluster "Returns a seq of all the documents in the specified cluster."
   [kcluster] (iterator-seq (.browseCluster *db* (name kcluster))))
 
-(defn count-class "" [kclass] (.countClass #^ODatabaseDocumentTx *db* (name kclass)))
+(defn count-class "" [kclass] (.countClass ^ODatabaseDocumentTx *db* (name kclass)))
 (defn count-cluster "" [id] (.countClusterElements *db* (if (keyword? id) (name id) id)))
 
 (defn get-cluster-names "" [] (map keyword (.getClusterNames *db*)))
@@ -84,17 +101,17 @@
 
 (defn db-closed? ""
   ([] (db-closed? *db*))
-  ([#^ODatabase db] (or (nil? db) (.isClosed db))))
+  ([^ODatabase db] (or (nil? db) (.isClosed db))))
 (defn db-open? ""
   ([] (db-open? *db*))
-  ([#^ODatabase db] (not (db-closed? db))))
+  ([^ODatabase db] (not (db-closed? db))))
 (defn db-exists? ""
   ([] (db-exists? *db*))
-  ([#^ODatabase db] (.exists #^ODatabase db)))
+  ([^ODatabase db] (.exists ^ODatabase db)))
 
 (defn db-info "Returns information relevant to the DB as a hash-map."
   ([] (db-info *db*))
-  ([#^ODatabaseRecord db]
+  ([^ODatabaseRecord db]
    {:name (.getName db),           :url (.getURL db),
     :status (str (.getStatus db)), :user (.getUser db)}))
 
@@ -116,22 +133,22 @@
 It can optionally take a Clojure hash-map to set the document's properties."
   ([kclass] (ODocument. *db* (name kclass)))
   ([kclass properties]
-   (let [#^ODocument d (document kclass)]
-     (dorun (for [p properties] (.field d (name (first p)) #^Object (second p))))
+   (let [^ODocument d (document kclass)]
+     (doseq [[k v] properties] (.field d (name k) ^Object (prop-in v)))
      d)))
 
 (defn save! "Saves an ODocument, an OClass or an object."
   ([item] (cond
-            (document? item) (.save #^ODocument item)
+            (document? item) (.save ^ODocument item)
             (oclass? item) (do (save-schema!) item)
             :else (do (.save *db* item) item)))
-  ([#^ODocument document kcluster] (.save document (name kcluster))))
+  ([^ODocument document kcluster] (.save document (name kcluster))))
 
 (defn get-id "Returns the ORecordId for the given document or graph element."
-  [#^ORecord record] (.getIdentity record))
+  [^ORecord record] (.getIdentity record))
 
 (defn id->vec "Given an ORID, returns a vector [cluster-id, cluster-position]."
-  [#^ORID orid] [(.getClusterId orid) (.getClusterPosition orid)])
+  [^ORID orid] [(.getClusterId orid) (.getClusterPosition orid)])
 
 (defn vec->id "Given a vector [cluster-id, cluster-position], returns an ORecordId."
   [ridvec] (ORecordId. (first ridvec) (second ridvec)))
@@ -140,30 +157,27 @@ It can optionally take a Clojure hash-map to set the document's properties."
   "Returns a seq of the properties from either an ODocument (as keywords) or an OClass (as OProperty instances)."
   [item]
   (if (document? item)
-    (map keyword (.fieldNames #^ODocument item))
-    (.properties #^OClass item)))
+    (map keyword (.fieldNames ^ODocument item))
+    (.properties ^OClass item)))
 
 (defn pget "Same a 'get', but for document properties."
-  [#^ODocument document key]
-  (let [v (.field document (name key))]
-    (if (and (string? v) (.startsWith #^String v ":"))
-      (keyword (.substring #^String v 1))
-      v)))
+  ([^ODocument document key else] (or (prop-out (.field document (name key))) else))
+  ([document key] (pget document key nil)))
 
 (defn passoc! "Same a 'assoc', but for document properties."
-  ([#^ODocument document key val]
-   (.field document (name key) (if (keyword? val) (str val) val))
+  ([^ODocument document key val]
+   (.field document (name key) (prop-in val))
    document)
   ([document key val & kvs]
    (apply passoc! (passoc! document key val) kvs)))
 
 (defn pdissoc! "Same a 'dissoc', but for document properties."
-  ([#^ODocument document key] (.removeField document (name key)) document)
-  ([document key & keys] (reduce pdissoc! document (conj key keys))))
+  ([^ODocument document key] (.removeField document (name key)) document)
+  ([document key & keys] (reduce pdissoc! document (cons key keys))))
 
 (defn pcontains?
   "Same a 'contains?', but for document properties."
-  [#^ODocument document key]
+  [^ODocument document key]
   (.containsField document (name key)))
 
 (defn merge! "Same a 'merge', but for document properties."
@@ -172,9 +186,10 @@ It can optionally take a Clojure hash-map to set the document's properties."
 
 (defn doc->map
   "Given an ODocument, returns a hash-map of its keys and values."
-  [#^ODocument document]
+  [^ODocument document]
   (with-meta
-    (apply hash-map (mapcat (fn [f] [(keyword f) (.field document f)])
+    (apply hash-map (mapcat (fn [f] (let [f (keyword f)]
+                                      [f (pget document f)]))
                             (.fieldNames document)))
     {:id (id->vec (get-id document)), :type (keyword (.getClassName document))}))
 
@@ -186,9 +201,9 @@ It can optionally take a Clojure hash-map to set the document's properties."
 Can also remove a class from the DB Schema."
   [x]
   (cond
-    (document? x) (.delete #^ODocument x)
-    (orid? x) (.delete #^ODocument (load-item x))
-    (oclass? x) (do (.dropClass (get-schema) (.getName #^OClass x))
+    (document? x) (.delete ^ODocument x)
+    (orid? x) (.delete ^ODocument (load-item x))
+    (oclass? x) (do (.dropClass (get-schema) (.getName ^OClass x))
                   (save! x))
     (keyword? x) (delete! (oclass x))
     :else (.delete *db* x)))
@@ -196,15 +211,15 @@ Can also remove a class from the DB Schema."
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Class Properties ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
-(defvar- kw->it
-  {:dictionary OProperty$INDEX_TYPE/DICTIONARY,
-   :fulltext   OProperty$INDEX_TYPE/FULLTEXT,
-   :unique     OProperty$INDEX_TYPE/UNIQUE,
-   :not-unique OProperty$INDEX_TYPE/NOTUNIQUE,
-   :proxy      OProperty$INDEX_TYPE/PROXY})
+(def ^:private kw->it
+  {:dictionary OClass$INDEX_TYPE/DICTIONARY,
+   :fulltext   OClass$INDEX_TYPE/FULLTEXT,
+   :unique     OClass$INDEX_TYPE/UNIQUE,
+   :not-unique OClass$INDEX_TYPE/NOTUNIQUE,
+   :proxy      OClass$INDEX_TYPE/PROXY})
 
-(defn oprop->map "Returns a map with all the relevant information from an OProperty object."
-  [#^OProperty oprop]
+(defn prop->map "Returns a map with all the relevant information from an OProperty object."
+  [^OProperty oprop]
   {:id (.getId oprop),                    :name (keyword (.getName oprop)),
    :type (.getType oprop),                :regexp (.getRegexp oprop),
    :min (.getMin oprop),                  :max (.getMax oprop),
@@ -212,14 +227,14 @@ Can also remove a class from the DB Schema."
    :mandatory? (.isMandatory oprop),      :nullable? (not (.isNotNull oprop)),
    :indexed? (.isIndexed oprop),          :index (.getIndex oprop)})
 
-(defn update-oprop!
+(defn update-prop!
   "Updates an OProperty object.
 
 Please note:
   min & max must be strings.
   type must be of the OType class.
   index must be one of the following keywords: :dictionary, :fulltext, :unique, :not-unique, :proxy"
-  [#^OProperty oprop {:keys [name type regexp min max mandatory? nullable? index]}]
+  [^OProperty oprop {:keys [name type regexp min max mandatory? nullable? index]}]
   (when name (.setName oprop (clojure.core/name name)))
   (when type (.setType oprop type))
   (when regexp (.setRegexp oprop regexp))
@@ -238,18 +253,18 @@ Please note:
   "When providing a type, it must be of the class OType.
 When using linked types #{EMBEDDED, LINK}, provide a vector of [link-type type]
 
-When providing a configuration hash-map, it must be in the format specified for update-oprop!."
-  ([#^OClass oclass pname ptype] (create-prop! pname ptype {}))
-  ([#^OClass oclass pname ptype conf]
+When providing a configuration hash-map, it must be in the format specified for update-prop!."
+  ([^OClass oclass pname ptype] (create-prop! pname ptype {}))
+  ([^OClass oclass pname ptype conf]
    (-> (if (vector? ptype)
          (.createProperty oclass (name pname) (first ptype) (second ptype))
          (.createProperty oclass (name pname) ptype))
-     (update-oprop! conf))
+     (update-prop! conf))
    oclass))
 
 (defn drop-prop! "Removes a property from an OClass."
   [kclass kname]
-  (let [#^OClass kclass (oclass kclass)]
+  (let [^OClass kclass (oclass kclass)]
     (.dropProperty oclass (name kname))
     (save! kclass)))
 
@@ -262,7 +277,7 @@ When providing a configuration hash-map, it must be in the format specified for 
 (defn- save-schema! ""
   [] (.save (get-schema)))
 
-(defn #^OClass oclass
+(defn ^OClass oclass
   "Returns an OClass given the classname as a keyword.
 If given an OClass, returns it inmediately."
   [kclass]
@@ -271,20 +286,20 @@ If given an OClass, returns it inmediately."
     (.getClass (get-schema) (name kclass))))
 
 (defn get-class-name "Returns the classname from an OClass or an ODocument."
-  [odoc] (keyword (if (instance? OClass odoc) (.getName #^OClass odoc) (.getClassName #^ODocument odoc))))
+  [odoc] (keyword (if (instance? OClass odoc) (.getName ^OClass odoc) (.getClassName ^ODocument odoc))))
 
 (defn oclasses "Returns a seq of all the OClass objects in the schema."
   [] (-> (get-schema) .getClasses seq))
 
 (defn derive! "Derives a class from another in the schema."
   [ksubclass, ksuperclass]
-  (let [#^OClass subclass (oclass ksubclass)
-        #^OClass superclass (oclass ksuperclass)]
+  (let [^OClass subclass (oclass ksubclass)
+        ^OClass superclass (oclass ksuperclass)]
     (.setSuperClass subclass superclass)
     (save! subclass)))
 
 (defn base-classes! ""
-  [kclass] (map #(keyword (.getName #^OClass %)) (.getBaseClasses (oclass kclass))))
+  [kclass] (map #(keyword (.getName ^OClass %)) (.getBaseClasses (oclass kclass))))
 
 (defn create-class!
   "Creates a class in the given database and makes it inherit the given superclass. Superclass can be of type String, Class or OClass."
@@ -310,8 +325,8 @@ If given an OClass, returns it inmediately."
 
 (defn superclass? ""
   [ksuperclass, ksubclass]
-  (let [#^OClass subclass (oclass ksubclass)
-        #^OClass superclass (oclass ksuperclass)]
+  (let [^OClass subclass (oclass ksubclass)
+        ^OClass superclass (oclass ksuperclass)]
     (.isSubClassOf subclass superclass)))
 
 (defn subclass? ""
@@ -324,12 +339,12 @@ If given an OClass, returns it inmediately."
   []
   (let [schema (get-schema)]
     {:id (.getIdentity schema), :version (.getVersion schema),
-     :classes (map #(keyword (.getName #^OClass %)) (.getClasses schema))}))
+     :classes (map #(keyword (.getName ^OClass %)) (.getClasses schema))}))
 
 ;;;;;;;;;;;;;
 ;;; Hooks ;;;
 ;;;;;;;;;;;;;
-(defvar- +triggers+
+(def ^:private +triggers+
   {'before-create 'onRecordBeforeCreate, 'after-create 'onRecordAfterCreate,
    'before-read 'onRecordBeforeRead, 'after-read 'onRecordAfterRead,
    'before-update 'onRecordBeforeUpdate, 'after-update 'onRecordAfterUpdate,

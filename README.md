@@ -7,7 +7,16 @@ clj-orient
 Usage
 -----
 
-Simply add this to your leiningen deps: `[clj-orient "0.2.2"]`
+Simply add this to your leiningen deps: `[clj-orient "0.3.0"]`
+
+WARNING
+-------
+
+As some of you may notice, version 0.3.0 has an slightly different set of dependencies. The changes to the code were small, but 2 important changes were introduced to the dependencies.
+The first one is that clj-orient now depends on Clojure 1.3.
+The second one is that clj-orient now depends on OrientDB 1.0rc6.
+
+I really hope this change does not affect anybody's code. If anybody has trouble with this version, you can always use version 0.2.2, which uses the old dependencies.
 
 Documentation
 -------------
@@ -44,7 +53,7 @@ Working with the database:
 	; Close the DB
 	(close-db!)
 
-	; Using transactions (*db* must be bound to some dabatase in the surrounding scope).
+	; Using transactions (*db* must be bound to some database in the surrounding scope).
 	(with-tx
 	  (form-1 ...)
 	  (form-2 ...)
@@ -90,5 +99,5 @@ Hooks:
 
 	(add-hook! my-hook)
 
-*Please note*: This is not a comprehensive guide. Please read the library documentation to know what functions or macros are available.
+*Please note*: This is not a comprehensive guide. Please read the library documentation to know what functions and macros are available.
 

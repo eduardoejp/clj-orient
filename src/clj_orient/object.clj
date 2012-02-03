@@ -10,8 +10,8 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
-       :doc "This namespace wraps the ObjectDB part of OrientDB."}
+(ns ^{:author "Eduardo Julian <eduardoejp@gmail.com>",
+      :doc "This namespace wraps the ObjectDB part of OrientDB."}
   clj-orient.object
   (:import (com.orientechnologies.orient.core.db.object ODatabaseObjectTx ODatabaseObjectPool))
   (:use (clj-orient core)))
@@ -20,11 +20,11 @@
   "Opens and returns a new ODatabaseObjectTx.")
 
 (defn register-entity-class! "" [class]
-  (-> #^ODatabaseObjectTx *db* .getEntityManager (.registerEntityClass class)))
+  (-> ^ODatabaseObjectTx *db* .getEntityManager (.registerEntityClass class)))
 
 (defn register-entity-classes! "" [package]
-  (-> #^ODatabaseObjectTx *db* .getEntityManager (.registerEntityClasses package)))
+  (-> ^ODatabaseObjectTx *db* .getEntityManager (.registerEntityClasses package)))
 
-(defn save-only-dirty! "" [?] (.setSaveOnlyDirty #^ODatabaseObjectTx *db* ?))
-(defn save-only-dirty? "" [] (.isSaveOnlyDirty #^ODatabaseObjectTx *db*))
-(defn set-dirty! "" [pojo] (.setDirty #^ODatabaseObjectTx *db* pojo))
+(defn save-only-dirty! "" [?] (.setSaveOnlyDirty ^ODatabaseObjectTx *db* ?))
+(defn save-only-dirty? "" [] (.isSaveOnlyDirty ^ODatabaseObjectTx *db*))
+(defn set-dirty! "" [pojo] (.setDirty ^ODatabaseObjectTx *db* pojo))

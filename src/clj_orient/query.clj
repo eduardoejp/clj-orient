@@ -10,7 +10,7 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns #^{:author "Eduardo Julian <eduardoejp@gmail.com>",
+(ns ^{:author "Eduardo Julian <eduardoejp@gmail.com>",
        :doc "This namespace wraps the querying functionality, both for native queries and SQL queries."}
   clj-orient.query
   (:use (clj-orient core))
@@ -21,7 +21,7 @@
     (com.orientechnologies.orient.core.db ODatabaseComplex)))
 
 ; Native Queries
-(defn- _special-cases [#^OQueryContextNativeSchema d v]
+(defn- _special-cases [^OQueryContextNativeSchema d v]
   (case (first v)
     :$= (.eq d (second v))
     :$not= (.different d (second v))
@@ -34,7 +34,7 @@
     (.eq d v)))
 
 (defn- map->nquery [qdoc kvs]
-  (reduce (fn [#^OQueryContextNativeSchema d [k v]]
+  (reduce (fn [^OQueryContextNativeSchema d [k v]]
             (let [d (.field d (name k))
                   d (if (vector? v)
                       (_special-cases d v)
@@ -63,22 +63,26 @@ When not provided a command, it works like :$= (equal)."
   [kclass filter-fn]
   (let [qry (proxy [com.orientechnologies.orient.core.query.nativ.ONativeSynchQuery]
               [*db*, (name kclass), (OQueryContextNativeSchema.)]
-              (filter [*record*] (.go #^OQueryContextNativeSchema (if (map? filter-fn)
+              (filter [*record*] (.go ^OQueryContextNativeSchema (if (map? filter-fn)
                                                                     (map->nquery *record* filter-fn)
                                                                     (filter-fn *record*)))))]
     (seq (.query *db* qry (to-array nil)))))
 
 ; SQL Queries
+(defn- prep-arg [v]
+  (if (or (keyword? v) (ratio? v))
+    (str v)
+    v))
+
 (defn- map->hmap [m]
   (let [hmap (HashMap.)]
-    (dorun (for [[k v] m] (.put hmap (name k) v)))
+    (doseq [[k v] m] (.put hmap (name k) (prep-arg v)))
     hmap))
 
 (defn- prep-args [args]
-  (cond
-    (map? args) [(map->hmap args)]
-    (or (vector? args) (seq? args)) args
-    :else args))
+  (to-array (if (map? args)
+              [(map->hmap args)]
+              (map prep-arg args))))
 
 (defn- paginate [qry args orid]
   (try
@@ -96,7 +100,7 @@ When using named parameters (:named), use a hash-map."
   ([qry args paginate?]
    (try
      (let [sqry (OSQLSynchQuery. qry)
-           res (.query *db* sqry (to-array (prep-args args)))]
+           res (.query *db* sqry (prep-args args))]
        (if paginate?
          (lazy-cat res (paginate qry args (-> res last .getIdentity .next)))
          (seq res)))
@@ -105,7 +109,7 @@ When using named parameters (:named), use a hash-map."
   ([qry args] (sql-query qry args false)))
 
 (defn run-sql-command! "Runs the given SQL command."
-  [comm] (-> #^ODatabaseComplex *db* (.command (OCommandSQL. comm))))
+  [comm] (-> ^ODatabaseComplex *db* (.command (OCommandSQL. comm))))
 
 (defmacro defsqlfn
   "Defines a new SQL function and installs it on the SQL engine."

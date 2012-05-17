@@ -1,4 +1,4 @@
-;; Copyright (C) 2011, Eduardo Julián. All rights reserved.
+;; Copyright (C) 2011~2012, Eduardo Julián. All rights reserved.
 ;;
 ;; The use and distribution terms for this software are covered by the 
 ;; Eclipse Public License 1.0
@@ -10,7 +10,7 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns ^{:author "Eduardo Julian <eduardoejp@gmail.com>",
+(ns ^{:author "Eduardo Julián <eduardoejp@gmail.com>",
       :doc "This namespace wraps the ObjectDB part of OrientDB."}
   clj-orient.object
   (:import (com.orientechnologies.orient.core.db.object ODatabaseObjectTx ODatabaseObjectPool))
@@ -28,3 +28,12 @@
 (defn save-only-dirty! "" [?] (.setSaveOnlyDirty ^ODatabaseObjectTx *db* ?))
 (defn save-only-dirty? "" [] (.isSaveOnlyDirty ^ODatabaseObjectTx *db*))
 (defn set-dirty! "" [pojo] (.setDirty ^ODatabaseObjectTx *db* pojo))
+
+(defn new-obj
+  "Creates a new object through the Object DB.
+The class can be a Class object or a keyword."
+  [klass]
+  (.newInstance ^ODatabaseObjectTx *db*
+    (if (class? klass)
+      klass
+      (kw->oclass-name klass))))

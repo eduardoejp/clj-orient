@@ -1,19 +1,19 @@
-(defproject clj-orient "0.3.0"
+(defproject clj-orient "0.4.0-SNAPSHOT"
   :description "Wrapper for the OrientDB Native APIs. It supports version 1.0 of the APIs."
   :url "https://github.com/eduardoejp/clj-orient"
   :license {:name "Eclipse Public License - v 1.0"
             :url "http://www.eclipse.org/legal/epl-v10.html"
             :distribution :repo
             :comments "same as Clojure"}
-  :dependencies [[org.clojure/clojure "1.3.0"]
-                 [com.orientechnologies/orient-commons "1.0rc6"]
-                 [com.orientechnologies/orientdb-core "1.0rc6"]
-                 [com.orientechnologies/orientdb-client "1.0rc6"]]
-  :dev-dependencies [[org.clojars.rayne/autodoc "0.8.0-SNAPSHOT"]]
-  :repositories {"orient" "http://www.orientechnologies.com/listing/m2"}
+  :plugins [[lein-autodoc "0.9.0"]],
+  :dependencies [[org.clojure/clojure "1.4.0"]
+                 [com.orientechnologies/orient-commons "1.0"]
+                 [com.orientechnologies/orientdb-core "1.0"]
+                 [com.orientechnologies/orientdb-client "1.0"]]
+  :repositories {"sonatype" "https://oss.sonatype.org/content/repositories/releases/"}
   :autodoc {:name "clj-orient"
             :description "Wrapper for the OrientDB Native APIs. It supports version 1.0 of the APIs."
-            :copyright "Copyright 2011 Eduardo Julian"
+            :copyright "Copyright 2011~2012 Eduardo Julian"
             :web-src-dir "http://github.com/eduardoejp/clj-orient/blob/"
             :web-home "http://eduardoejp.github.com/clj-orient/"
             :output-path "autodoc"}

@@ -1,11 +1,11 @@
-(defproject clj-orient "0.4.0-SNAPSHOT"
+(defproject clj-orient "0.4.0"
   :description "Wrapper for the OrientDB Native APIs. It supports version 1.0 of the APIs."
   :url "https://github.com/eduardoejp/clj-orient"
   :license {:name "Eclipse Public License - v 1.0"
             :url "http://www.eclipse.org/legal/epl-v10.html"
             :distribution :repo
             :comments "same as Clojure"}
-  :plugins [[lein-autodoc "0.9.0"]],
+  :plugins [[lein-autodoc "0.9.0"]]
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [com.orientechnologies/orient-commons "1.0"]
                  [com.orientechnologies/orientdb-core "1.0"]

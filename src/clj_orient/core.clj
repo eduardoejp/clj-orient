@@ -67,9 +67,9 @@
   (valAt [_ k not-found]
     (or (prop-out (.field odoc (name k)))
         (case k
-          :$rid (.getIdentity odoc)
-          :$class (oclass-name->kw (.field odoc "@class"))
-          :$version (.field odoc "@version")
+          :#rid (.getIdentity odoc)
+          :#class (oclass-name->kw (.field odoc "@class"))
+          :#version (.field odoc "@version")
           not-found)))
   (valAt [_ k] (.valAt _ k nil))
   
@@ -220,14 +220,11 @@ It can optionally take a Clojure hash-map to set the document's properties."
           item)
   ([document kcluster] (.save ^ODocument (.odoc document) (kw->oclass-name kcluster))))
 
-(defn orid "Returns the ORecordId for the given ORecord. When using CljODoc objects, use :$rid instead."
-  [^ORecord record] (.getIdentity record))
+(defn orid "Transforms a vector into an ORecordId object."
+  [ridvec] (ORecordId. (first ridvec) (second ridvec)))
 
 (defn orid->vec "Given an ORID, returns a vector [cluster-id, cluster-position]."
   [^ORID orid] [(.getClusterId orid) (.getClusterPosition orid)])
-
-(defn vec->orid "Given a vector [cluster-id, cluster-position], returns an ORecordId."
-  [ridvec] (ORecordId. (first ridvec) (second ridvec)))
 
 (defn cluster-pos "Given an ORID, returns the Cluster Position"
   [orid] (.getClusterPosition orid))
@@ -252,7 +249,7 @@ Can also remove a class from the DB Schema."
   nil)
 
 (defn undo! "Undoes local changes to documents."
-  [d] (.. d odoc (undo)))
+  [d] (-> d .-odoc .undo))
 
 (defn doc->map [x] (merge {} x))
 
@@ -266,7 +263,7 @@ Can also remove a class from the DB Schema."
    :not-unique OClass$INDEX_TYPE/NOTUNIQUE,
    :proxy      OClass$INDEX_TYPE/PROXY})
 
-(def kw->otype
+(def ^:private kw->otype
   {; Basic data-types
    :boolean OType/BOOLEAN
    :byte OType/BYTE
@@ -285,14 +282,14 @@ Can also remove a class from the DB Schema."
    ; Embedded
    :embedded OType/EMBEDDED
    :embedded-list OType/EMBEDDEDLIST
-   :embedded-map OType/EMBEDDEDMAP
    :embedded-set OType/EMBEDDEDSET
+   :embedded-map OType/EMBEDDEDMAP
    
    ; Inter-document links
    :link OType/LINK
    :link-list OType/LINKLIST
-   :link-map OType/LINKMAP
    :link-set OType/LINKSET
+   :link-map OType/LINKMAP
    
    ; Other stuff...
    :binary OType/BINARY
@@ -300,7 +297,9 @@ Can also remove a class from the DB Schema."
    :transient OType/TRANSIENT
    })
 
-(def otype->kw ^:const (clojure.set/map-invert kw->otype))
+(def ^:private otype->kw ^:const (clojure.set/map-invert kw->otype))
+
+(defn get-prop "" [prop klass] (.getProperty (oclass klass) (name prop)))
 
 (defn update-prop!
   "Updates an OProperty object.
@@ -313,19 +312,20 @@ Please note:
       :link :link-list :link-map :link-set}
   index must be one of the following keywords: #{:dictionary, :fulltext, :unique, :not-unique, :proxy}
   If passed a 'false' value for index, the index is dropped."
-  [^OProperty oprop {:keys [name type regex min max mandatory? nullable? index]}]
-  (if name (.setName oprop (clojure.core/name name)))
-  (if type (.setType oprop (kw->otype type)))
-  (if regex (.setRegexp oprop (str regex)))
-  (if min (.setMin oprop (str min)))
-  (if max (.setMax oprop (str max)))
-  (if mandatory? (.setMandatory oprop mandatory?))
-  (if nullable? (.setNotNull oprop (not nullable?)))
-  (cond
-    (keyword? index) (.createIndex oprop (kw->it index))
-    (false? index) (.dropIndex oprop)
-    :else nil)
-  oprop)
+  ([^OProperty oprop {:keys [name type regex min max mandatory? nullable? index]}]
+   (if name (.setName oprop (clojure.core/name name)))
+   (if type (.setType oprop (kw->otype type)))
+   (if regex (.setRegexp oprop (str regex)))
+   (if min (.setMin oprop (str min)))
+   (if max (.setMax oprop (str max)))
+   (if-not (nil? mandatory?) (.setMandatory oprop mandatory?))
+   (if-not (nil? nullable?) (.setNotNull oprop (not nullable?)))
+   (cond
+     (keyword? index) (.createIndex oprop (kw->it index))
+     (false? index) (.dropIndex oprop)
+     :else nil)
+   oprop)
+  ([klass prop conf] (update-prop! (get-prop prop klass) conf)))
 
 (defn create-prop!
   "When providing a type, it must be one of the following keywords:
@@ -347,7 +347,7 @@ When providing a configuration hash-map, it must be in the format specified for 
 (defn props "" [klass] (map #(-> % .getName keyword) (.declaredProperties (oclass klass))))
 (defn prop-info "Returns a hash-map with detailed information about a class' property."
   [klass prop]
-  (let [p (.getProperty (oclass klass) (name prop))]
+  (let [p (get-prop prop klass)]
     {:type (otype->kw (.getType p))
      :min (.getMin p)
      :max (.getMax p)
@@ -367,13 +367,13 @@ When providing a configuration hash-map, it must be in the format specified for 
     (.dropProperty kclass (kw->oclass-name kname))
     (save! kclass)))
 
-(defn are-indexed? "Tests whether the given props are indexed for the given oclass."
+(defn indexed? "Tests whether the given props are indexed for the given oclass."
   [klass props] (.areIndexed (oclass klass) (map name props)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Document/GraphElement Classes ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn schema "Returns *db*'s OSchema"
+(defn schema "Returns *db*'s OSchema."
   [] (-> *db* .getMetadata .getSchema))
 
 (defn save-schema! "" [] (.save (schema)))
@@ -386,7 +386,7 @@ If given an OClass, returns it inmediately."
     kclass
     (.getClass (schema) (kw->oclass-name kclass))))
 
-(defn class-name "Returns the classname from an OClass."
+(defn class-name "Returns the classname (as a keyword) from an OClass."
   [odoc] (oclass-name->kw (.getName ^OClass odoc)))
 
 (defn oclasses "Returns a seq of all the OClass objects in the schema."
@@ -400,10 +400,11 @@ If given an OClass, returns it inmediately."
     (save! subclass)
     ksubclass))
 
-(defn sub-classes "" [kclass] (set (map #(oclass-name->kw (.getName ^OClass %)) (iterator-seq (.getBaseClasses (oclass kclass))))))
+(defn sub-classes "Returns a set of the names (as keywords) of subclasses for the given oclass."
+  [kclass] (set (map #(oclass-name->kw (.getName ^OClass %)) (iterator-seq (.getBaseClasses (oclass kclass))))))
 
 (defn create-class!
-  "Creates a class in the given database and makes it inherit the given superclass. Superclass can be of type String, Class or OClass."
+  "Creates a class in the given database and makes it inherit the given superclass."
   ([kclass] (-> (schema) (.createClass (kw->oclass-name kclass)) save!))
   ([kclass ksuperclass-or-props]
    (let [oclass (create-class! kclass)]
@@ -421,8 +422,7 @@ If given an OClass, returns it inmediately."
                         oclass props)]
      (save! oclass))))
 
-(defn exists-class? ""
-  [kclass] (.existsClass (schema) (kw->oclass-name kclass)))
+(defn exists-class? "" [kclass] (.existsClass (schema) (kw->oclass-name kclass)))
 
 (defn superclass? ""
   [ksuperclass, ksubclass]
@@ -430,17 +430,15 @@ If given an OClass, returns it inmediately."
         ^OClass superclass (oclass ksuperclass)]
     (.isSubClassOf subclass superclass)))
 
-(defn subclass? ""
-  [ksubclass, ksuperclass] (superclass? ksuperclass ksubclass))
+(defn subclass? "" [ksubclass, ksuperclass] (superclass? ksuperclass ksubclass))
 
-(defn truncate-class! ""
-  [kclass] (.truncate (oclass kclass)))
+(defn truncate-class! "" [kclass] (.truncate (oclass kclass)))
 
 (defn schema-info ""
   []
   (let [schema (schema)]
     {:id (.getIdentity schema), :version (.getVersion schema),
-     :classes (map #(oclass-name->kw (.getName ^OClass %)) (.getClasses schema))}))
+     :classes (set (map #(oclass-name->kw (.getName ^OClass %)) (.getClasses schema)))}))
 
 ;;;;;;;;;;;;;
 ;;; Hooks ;;;
@@ -481,7 +479,7 @@ Notes: defhook only creates the hook. To add it to the current *db* use add-hook
 ; For dealing with ORecordBytes
 (defn record-bytes
   "For creating ORecordBytes objects. The source can be either a byte array or an input stream.
-To get the data out, use to-output-stream."
+To get the data out, use ->output-stream."
   [source]
   (if (instance? java.io.InputStream source)
     (doto (ORecordBytes. *db*) (.fromInputStream source))

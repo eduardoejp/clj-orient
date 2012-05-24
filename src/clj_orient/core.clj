@@ -70,7 +70,9 @@
           :#rid (.getIdentity odoc)
           :#class (oclass-name->kw (.field odoc "@class"))
           :#version (.field odoc "@version")
-          not-found)))
+          :#size (.field odoc "@size")
+          :#type (.field odoc "@type"))
+        not-found))
   (valAt [_ k] (.valAt _ k nil))
   
   clojure.lang.IFn
@@ -84,7 +86,7 @@
     (.field odoc "__meta__" (prop-in new-meta)) self)
   
   java.lang.Object
-  (equals [self o] (= odoc (if (instance? CljODoc o) (.odoc o) o))))
+  (equals [self o] (= (dissoc odoc "__meta__") (if (instance? CljODoc o) (.odoc o) o))))
 
 (defn wrap-odoc "Wraps an ODocument object inside a CljODoc object."
   [odoc] (CljODoc. odoc))

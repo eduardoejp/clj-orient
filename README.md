@@ -33,6 +33,10 @@ Currently the library is divided into 6 namespaces:
 `schema`: For easy definition of database schemas.
 `script`: For doing server-side scripting.
 
+Tests
+-----
+There is a test suite in the test directory that right now tests almost all of the library functionality. It can be run using `lein test`.
+
 Examples
 --------
 

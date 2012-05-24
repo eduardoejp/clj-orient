@@ -106,7 +106,7 @@ Returns results as a lazy-seq of CljODoc objects."
   [fields target pred & [limit]]
   (-> (OTraverse.)
     (.fields (map name fields))
-    (.target (map #(.odoc %) target))
+    (.target (map #(if (orid? %) % (% :#rid)) target))
     (.limit (or limit 0))
     (.predicate (reify OCommandPredicate
                   (evaluate [self odoc ctx]
@@ -151,10 +151,10 @@ When using named parameters (:named), use a hash-map."
 
 (defmacro defsqlfn
   "Defines a new SQL function and installs it on the SQL engine.
-Besides the arguments passed to the function, it will also receive the hidden params *document* and *request*,
-of types ODocument and OCommandRequest respectively.
+Besides the arguments passed to the function, it will also receive the hidden params *document* and *requester*,
+of types ODocument and OCommandExecutor respectively.
 
-If the function does not access within it's body the hidden params *document* and *request*, a local (Clojure) version of the
+If the function does not access within it's body the hidden params *document* and *requester*, a local (Clojure) version of the
 function will also be defined."
   [sym args & body]
   (let [[doc-str args body] (if (string? args) [args (first body) (rest body)] [nil args body])
@@ -162,10 +162,10 @@ function will also be defined."
     `(let [sqlfn# (proxy [com.orientechnologies.orient.core.sql.functions.OSQLFunctionAbstract]
                     [~(name sym) ~(count args) ~(count args)]
                     (~'getSyntax [] ~(str sym "(" (apply str (interpose ", " (rest args))) ")"))
-                    (~'execute [~'*document* args# ~'*request*] (let [~args args#] ~@body))
+                    (~'execute [~'*document* args# ~'*requester*] (let [~'*document* (~'CljODoc. ~'*document*) ~args args#] ~@body))
                     )]
        (swap! sql-fns conj [~(name sym) sqlfn#])
-       ~(if-not (some #(or (= % '*document*) (= % '*request*)) (flatten body))
+       ~(if-not (some #(or (= % '*document*) (= % '*requester*)) (flatten body))
           `(defn ~sym ~doc-str ~args ~@body))
        )))
 

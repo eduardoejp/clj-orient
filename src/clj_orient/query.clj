@@ -105,7 +105,7 @@ pred = function that takes a CljODoc and a function that takes a keyword for acc
 Returns results as a lazy-seq of CljODoc objects."
   [fields target pred & [limit]]
   (-> (OTraverse.)
-    (.fields (map kw->oclass-name fields))
+    (.fields (map name fields))
     (.target (map #(.odoc %) target))
     (.limit (or limit 0))
     (.predicate (reify OCommandPredicate
@@ -314,19 +314,19 @@ function will also be defined."
                          where ; Tests
                          inverse? order-by limit skip]}] ; Miscellaneous
   (str (cond
-         traverse (apply str "TRAVERSE " (interpose "," (map kw->oclass-name traverse)))
+         traverse (apply str "TRAVERSE " (interpose "," (map name traverse)))
          update (str "UPDATE " (from->sql update))
          command (command->sql command)
          truncate (str "TRUNCATE " (truncate->sql truncate))
          grant (str "GRANT " (permission->sql grant))
          revoke (str "REVOKE " (permission->sql revoke))
-         link (str "CREATE LINK " (kw->oclass-name link))
+         link (str "CREATE LINK " (name link))
          :else (str "SELECT" (if select (apply str " " (interpose "," (select->sql select))))))
-       (cond set (apply str " " (interpose ", " (map (fn [[k v]] (str "SET " (kw->oclass-name k) " = " (item->sql v))) set)))
-             put (apply str " " (interpose ", " (map (fn [[f [k v]]] (str "PUT " (kw->oclass-name f) " = " (item->sql k) "," (item->sql v))) put)))
-             add (apply str " " (interpose ", " (map (fn [[k v]] (str "ADD " (kw->oclass-name k) " = " (item->sql v))) add)))
+       (cond set (apply str " " (interpose ", " (map (fn [[k v]] (str "SET " (name k) " = " (item->sql v))) set)))
+             put (apply str " " (interpose ", " (map (fn [[f [k v]]] (str "PUT " (name f) " = " (item->sql k) "," (item->sql v))) put)))
+             add (apply str " " (interpose ", " (map (fn [[k v]] (str "ADD " (name k) " = " (item->sql v))) add)))
              remove (apply str " " (interpose ", " (map (fn [i] (if (coll? i)
-                                                                  (str "REMOVE " (kw->oclass-name (first i)) " = " (item->sql (second i)))
+                                                                  (str "REMOVE " (name (first i)) " = " (item->sql (second i)))
                                                                   (str "REMOVE " (item->sql i))))
                                                         remove)))
              )
@@ -335,10 +335,10 @@ function will also be defined."
              into (str " INTO " (into->sql into))
              target (str " " (from->sql target)))
        (if classes (str " [" (apply str (interpose " " (map kw->oclass-name classes))) "]"))
-       (cond fields (str "(" (apply str (interpose "," (map kw->oclass-name (keys fields)))) ")"
+       (cond fields (str "(" (apply str (interpose "," (map name (keys fields)))) ")"
                          " VALUES "
                          "(" (apply str (interpose "," (map item->sql (vals fields)))) ")")
-             fields* (str "(" (apply str (interpose "," (map kw->oclass-name (keys fields*)))) ")"
+             fields* (str "(" (apply str (interpose "," (map name (keys fields*)))) ")"
                           " VALUES "
                           (->> fields* vals (apply interleave) (partition (count fields*))
                             (map #(map item->sql %))

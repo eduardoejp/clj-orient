@@ -364,7 +364,7 @@ When providing a configuration hash-map, it must be in the format specified for 
 (defn drop-prop! "Removes a property from an OClass."
   [kclass kname]
   (let [^OClass kclass (oclass kclass)]
-    (.dropProperty kclass (kw->oclass-name kname))
+    (.dropProperty kclass (name kname))
     (save! kclass)))
 
 (defn indexed? "Tests whether the given props are indexed for the given oclass."

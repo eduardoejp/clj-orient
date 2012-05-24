@@ -86,7 +86,7 @@
     (.field odoc "__meta__" (prop-in new-meta)) self)
   
   java.lang.Object
-  (equals [self o] (= (dissoc odoc "__meta__") (if (instance? CljODoc o) (.odoc o) o))))
+  (equals [self o] (= (dissoc odoc "__meta__") (if (instance? CljODoc o) (dissoc (.odoc o) "__meta__") o))))
 
 (defn wrap-odoc "Wraps an ODocument object inside a CljODoc object."
   [odoc] (CljODoc. odoc))

@@ -14,6 +14,8 @@ WARNING
 
 Version 0.4.0 breaks away significantly from the previous version's way of doing things. Because of that, anybody who had been using this library before will certainly have to change his/her code. Please excuse the sudden change but I believe the changes I introduced were worth the trouble.
 
+Many functions have also changed names, even though their functionality stays the same. The decision was make to give them shorter or cleared names. Excuse the inconvenience.
+
 Documentation
 -------------
 

@@ -19,12 +19,14 @@
 (def schema-classes (atom []))
 
 (defn- install-oclass! [[klass base & props]]
+  ;(prn "Class:" klass base)
   (if (exists-class? klass)
     (do
       (if base
         (if-not (subclass? klass base)
           (derive! klass base)))
       (doseq [[p type conf] props]
+        ;(prn "Prop:" p type conf)
         (if (exists-prop? klass p)
           (if type
             (update-prop! klass p conf)

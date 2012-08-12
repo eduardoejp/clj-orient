@@ -83,8 +83,9 @@ When not provided a command, it works like :$= (.eq)."
   "Executes a native query that filters results by the class of the documents (as a keyword) and a filtering function.
 It takes either an ONativeSynchQuery object, a function or a hash-map.
 Returns results as a lazy-seq of CljODoc objects."
-  [klass query]
-  (let [query (if (instance? ONativeSynchQuery query) query (->native-query klass query))]
+  [klass query & [fetch-plan]]
+  (let [query (if (instance? ONativeSynchQuery query) query (->native-query klass query))
+        query (if fetch-plan (.setFetchPlan query fetch-plan) query)]
     (map #(CljODoc. %) (.query *db* query (to-array nil)))))
 
 ; <API Graph Traversals>
@@ -139,18 +140,26 @@ Returns results as a lazy-seq of CljODoc objects."
   "Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and the option to paginate results.
 When using positional parameters (?), use a vector.
 When using named parameters (:named), use a hash-map."
-  [qry & [args paginate?]]
-  (let [sqry (OSQLSynchQuery. qry)
-        res (.query *db* sqry (prep-args args))]
-    (if paginate?
-      (lazy-cat (map #(CljODoc. %) res) (paginate qry args (-> res last .getIdentity .next)))
-      (map #(CljODoc. %) res))))
+  ([qry args paginate? fetch-plan]
+   (let [sqry (OSQLSynchQuery. qry)
+         sqry (if fetch-plan (.setFetchPlan sqry fetch-plan) sqry)
+         res (.query *db* sqry (prep-args args))]
+     (if paginate?
+       (lazy-cat (map #(CljODoc. %) res) (paginate qry args (-> res last .getIdentity .next)))
+       (map #(CljODoc. %) res))))
+  ([qry] (sql-query qry nil nil nil))
+  ([qry args] (sql-query qry args nil nil))
+  ([qry args paginate?-or-fetch-plan]
+   (if (string? paginate?-or-fetch-plan)
+     (sql-query qry args nil paginate?-or-fetch-plan)
+     (sql-query qry args paginate?-or-fetch-plan nil))))
 
 (defn sql-command! "Runs the given SQL command."
-  [comm] (-> ^ODatabaseComplex *db* (.command (OCommandSQL. comm))) nil)
+  ([comm] (-> ^ODatabaseComplex *db* (.command (OCommandSQL. comm)) (.execute (object-array 0))) nil)
+  ([comm args] (-> ^ODatabaseComplex *db* (.command (OCommandSQL. comm)) (.execute (prep-args args))) nil))
 
 (defmacro defsqlfn
-  "Defines a new SQL function and installs it on the SQL engine.
+  "Defines a new SQL function that can be installed on the SQL engine.
 Besides the arguments passed to the function, it will also receive the hidden params *document* and *requester*,
 of types ODocument and OCommandExecutor respectively.
 
@@ -162,7 +171,7 @@ function will also be defined."
     `(let [sqlfn# (proxy [com.orientechnologies.orient.core.sql.functions.OSQLFunctionAbstract]
                     [~(name sym) ~(count args) ~(count args)]
                     (~'getSyntax [] ~(str sym "(" (apply str (interpose ", " (rest args))) ")"))
-                    (~'execute [~'*document* args# ~'*requester*] (let [~'*document* (~'CljODoc. ~'*document*) ~args args#] ~@body))
+                    (~'execute [~'*document* args# ~'*requester*] (let [~'*document* (~'clj-orient.core/wrap-odoc ~'*document*) ~args args#] ~@body))
                     )]
        (swap! sql-fns conj [~(name sym) sqlfn#])
        ~(if-not (some #(or (= % '*document*) (= % '*requester*)) (flatten body))
@@ -221,14 +230,14 @@ function will also be defined."
 
 (defn- special-ops->sql [[op & [_1 _2 _3 _4 & _rest] :as form]]
   (case (name op)
-    "instance?" (str _2 " INSTANCEOF " (pr-str (sym->sql _1)))
-    "aget" (str _1 "[" (cond (list? _2) (item->sql _2)
-                             (vector? _2) (apply str (interpose "," _2))
-                             (and (integer? _2) (integer? _3)) (str _2 "-" _3)
-                             :else _2)
+    "instance?" (str (name _2) " INSTANCEOF " (pr-str (sym->sql _1)))
+    "aget" (str (name _1) "[" (cond (list? _2) (item->sql _2)
+                                    (vector? _2) (apply str (interpose "," _2))
+                                    (and (integer? _2) (integer? _3)) (str _2 "-" _3)
+                                    :else _2)
                 "]")
-    "between?" (str (sym->sql _1) " BETWEEN " _2 " AND " _3)
-    "contains?" (str (sym->sql _1) " CONTAINS "
+    "between?" (str (name  _1) " BETWEEN " _2 " AND " _3)
+    "contains?" (str (name  _1) " CONTAINS "
                      (let [x (item->sql _2)]
                        (cond (.startsWith x "(") x
                              
@@ -238,7 +247,7 @@ function will also be defined."
                              (str "(" x ")")
                              
                              :else x)))
-    "contains-all?" (str (sym->sql _1) " CONTAINSALL " (let [x (item->sql _2)] (if (.startsWith x "(") x (str "(" x ")"))))
+    "contains-all?" (str (name  _1) " CONTAINSALL " (let [x (item->sql _2)] (if (.startsWith x "(") x (str "(" x ")"))))
     "gremlin" (str "GREMLIN(" (pr-str _1) ")")
     "traverse" (str "TRAVERSE(" (or _1 0) (str "," (or _2 -1))
                     (if _3 (->> _3 (map name) (interpose ",") (apply str) pr-str (str ",")))
@@ -254,13 +263,14 @@ function will also be defined."
 (defn- sym->sql [k]
   (let [n (name k)]
     (cond
+      (= n "#meta") "__meta__"
       (.startsWith n "#") (str \@ (.substring n 1))
       (and (.startsWith n "?") (not= n "?")) (str ":" (.substring n 1))
       :else n)))
 (defn- form->sql [[op & body :as form]]
   (let [op (name op)]
     (cond (in-op->sql op) (str (item->sql (first body)) " " (in-op->sql op) " " (item->sql (second body)))
-          (group-in-ops->sql op) (str "(" (apply str (interpose (group-in-ops->sql op) (map item->sql body))) ")")
+          (group-in-ops->sql op) (apply str (interpose (group-in-ops->sql op) (map item->sql body)))
           (post-ops->sql op) (str (item->sql (first body)) (post-ops->sql op))
           (special-op? op) (special-ops->sql form)
           (.startsWith op ".") (str (item->sql (first body)) op "(" (apply str (interpose "," (map item->sql (rest body)))) ")")
@@ -286,16 +296,14 @@ function will also be defined."
 
 (defn- select->sql [s]
   (map (fn [x] (if (vector? x)
-                 (str (sym->sql (first x)) " AS " (sym->sql (second x)))
+                 (str (item->sql (first x)) " AS " (sym->sql (second x)))
                  (item->sql x)))
        s))
 (defn- where->sql [s]
   (apply str
          (interpose " AND "
-                    (map #(cond (symbol? %) (sym->sql %)
-                                (seq? %) (form->sql %))
-                         (filter (complement nil?) s)
-                         ))))
+                    (map item->sql
+                         (filter (complement nil?) s)))))
 
 (defn- into->sql [f]
   (cond (orid? f) (str f)
@@ -305,7 +313,7 @@ function will also be defined."
 
 (defn- from->sql [f] (if (map? f) (str "(" (map->sql f) ")") (into->sql f)))
 
-(defn- map->sql [{:keys [select traverse update command truncate ; Types of commands/queries
+(defn map->sql [{:keys [select traverse update command truncate ; Types of commands/queries
                          grant revoke ; Granting & revoking rights
                          set put add remove ; Ways to update
                          link type ; For document links
@@ -349,7 +357,7 @@ function will also be defined."
                             (apply str)))
              )
        (if on (str " ON " (kw->oclass-name on)))
-       (if to (str " TO " (kw->oclass-name to)))
+       (if to (str " TO " (name to)))
        (if where (str " WHERE " (where->sql where)))
        (if inverse? " INVERSE")
        (if order-by (apply str " ORDER BY " (interpose " " (map (fn [[n o]] (str (name n) " " (order->sql o))) (partition 2 order-by)))))
@@ -359,10 +367,14 @@ function will also be defined."
   )
 
 (defn clj-query "Does a SQL query against the database written as a Clojure map."
-  [query-map args] (sql-query (map->sql query-map) args))
+  [{fetch-plan :$fetch-plan, :as query-map} args]
+  (sql-query (map->sql query-map) args nil fetch-plan))
 
 (defmacro clj-query* "Same as clj-query, but transforms the map into a SQL string at compile time."
-  [query-map args] `(sql-query ~(map->sql query-map) ~args))
+  [{fetch-plan :$fetch-plan, :as query-map} args]
+  `(sql-query ~(map->sql query-map) ~args nil ~fetch-plan))
 
 (defn clj-command! "Runs a SQL command against the database written as a Clojure map."
-  [query-map args] (sql-command! (map->sql query-map)))
+  [query-map]
+  (prn (map->sql query-map))
+  (sql-command! (map->sql query-map)))

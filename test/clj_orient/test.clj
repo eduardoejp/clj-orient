@@ -10,7 +10,7 @@
 ;;
 ;; You must not remove this notice, or any other, from this software.
 
-(ns ^{:author "Eduardo Julián <eduardoejp@gmail.com>",
+(ns ^{:author "Eduardo Julian <eduardoejp@gmail.com>",
       :doc "A whole lotta tests."}
   clj-orient.test
   (:use clojure.test)
@@ -20,6 +20,8 @@
             [clj-orient.script :as os]
             [clj-orient.schema :as osch])
   (:import clj_orient.core.CljODoc))
+
+(def db-name (atom nil))
 
 ; <Tests>
 (deftest document-test
@@ -56,8 +58,8 @@
        (oc/db-closed?) false
        (oc/db-open?) true
        (oc/db-exists?) true
-       (:name (oc/db-info)) "test"
-       (:url (oc/db-info)) "memory:test"
+       (:name (oc/db-info)) @db-name
+       (:url (oc/db-info)) (str "memory:" @db-name)
        )
   (is ((set (oc/cluster-names)) :core/foo))
   )
@@ -187,7 +189,6 @@
   (og/create-vertex-type! :person)
   (og/create-edge-type! :is-friend)
   (oc/save-schema!)
-  
   (let [mankind (oc/save! (og/vertex))
         u1 (oc/save! (og/vertex :person {:name "Bill"}))
         u2 (oc/save! (og/vertex :person {:name "Bob"}))
@@ -237,37 +238,58 @@
   (oq/defsqlfn allowBob [n] (= n "Bob"))
   (oq/install-sql-fns!)
   (are [x y] (= x y)
-       ;1 (count (oq/sql-query "SELECT FROM person WHERE name = ?" ["Bob"]))
-       ;1 (count (oq/sql-query "SELECT FROM person WHERE name = :name" {:name "Bill"}))
-       ;2 (count (oq/sql-query "SELECT FROM person" nil))
-       ;0 (count (oq/sql-query "SELECT FROM person WHERE notPass()" nil))
-       1 (count (oq/clj-query '{:from person :where [(= name ?)]} ["Bob"]))
+       1 (count (oq/sql-query "SELECT FROM person WHERE name = ?" ["Bob"] "*:-1"))
+       1 (count (oq/sql-query "SELECT FROM person WHERE name = :name" {:name "Bill"}))
+       2 (count (oq/sql-query "SELECT FROM person" nil "*:-1"))
+       0 (count (oq/sql-query "SELECT FROM person WHERE notPass()" nil))
+       1 (count (oq/clj-query '{:from person :where [(= name ?)], :$fetch-plan "*:-1"} ["Bob"]))
        1 (count (oq/clj-query '{:from person :where [(= name ?name)]} {:name "Bill"}))
-       2 (count (oq/clj-query '{:from person} nil))
+       2 (count (oq/clj-query '{:from person, :$fetch-plan "*:-1"} nil))
        0 (count (oq/clj-query '{:from person :where [(notPass)]} nil))
        "Bob" (:name (first (oq/sql-query "SELECT FROM person WHERE allowBob(name)" nil)))
        ))
 
-(defn test-ns-hook []
-  (oc/create-db! "memory:test")
-  ;(binding [*test-out* (clojure.java.io/writer (java.io.FileOutputStream. "clj-orient-test-report"))]
-    (oc/with-db (og/open-graph-db! "memory:test" "admin" "admin")
-      ;(with-test-out
-        (document-test)
-        (classes-and-clusters)
-        (transactions)
-        (orecord-id)
-        (oclasses)
-        (schema-properties)
-        (hooks)
-        (orecord-bytes)
-        (graph-test)
-        (native-query-test)
-        (sql-test)
-        ;(script) ; It's commented out because I'm using an in-memory DB.
-        ;)
-      )
-    ;)
+(deftest massive-insert-test
+  (prn "<TEST START>" 'massive-insert-test)
+  (let [docs (map (fn [n] {:id n}) (range 1000))]
+    (print "Normael Insertion of 1K documents -> ")
+    (time
+     (dotimes [n 1000]
+      (oc/save! (oc/document :batch1 {:id n}))))
+    (print "Massive Insertion of 1K documents -> ")
+    (time (oc/documents :batch2 docs)))
+  (is (= 1000 (count (oq/clj-query '{:from batch2} nil))))
   )
 
-;(run-tests)
+(deftest cache-test
+  (prn "<TEST START>" 'cache-test)
+  (let [d (oc/save! (oc/document :core/cache {:fname "Cachy", :lname "McCache"}))]
+    (oc/pin! d)
+    (is (oc/pinned? d))
+    (oc/unpin! d)
+    (is (not (oc/pinned? d)))
+    (oc/unload! d)
+    (oc/reload! d)))
+
+(defn test-ns-hook []
+  (reset! db-name (str (gensym "test")))
+  (oc/create-db! (str "memory:" @db-name))
+  (oc/with-db (og/open-graph-db! (str "memory:" @db-name) "admin" "admin")
+    (with-test-out
+      (document-test)
+      (classes-and-clusters)
+      (transactions)
+      (orecord-id)
+      (oclasses)
+      (schema-properties)
+      (hooks)
+      (orecord-bytes)
+      (graph-test)
+      (native-query-test)
+      (sql-test)
+      (massive-insert-test)
+      (cache-test)
+      #_(script) ; It's commented out because I'm using an in-memory DB.
+      )))
+
+;; (run-tests)

@@ -13,27 +13,34 @@
 (ns ^{:author "Eduardo Julián <eduardoejp@gmail.com>",
       :doc "This namespace wraps the ObjectDB part of OrientDB."}
   clj-orient.object
-  (:import (com.orientechnologies.orient.core.db.object ODatabaseObjectTx ODatabaseObjectPool))
-  (:use (clj-orient core)))
+  (:import (com.orientechnologies.orient.object.db OObjectDatabaseTx OObjectDatabasePool))
+  (:require [clj-orient.core :as oc]))
 
-(defopener open-object-db! ODatabaseObjectPool
-  "Opens and returns a new ODatabaseObjectTx.")
+(oc/defopener open-object-db! OObjectDatabasePool
+  "Opens and returns a new OObjectDatabaseTx.")
 
 (defn register-entity-class! "" [class]
-  (-> ^ODatabaseObjectTx *db* .getEntityManager (.registerEntityClass class)))
+  (-> ^OObjectDatabaseTx oc/*db* .getEntityManager (.registerEntityClass class)))
 
 (defn register-entity-classes! "" [package]
-  (-> ^ODatabaseObjectTx *db* .getEntityManager (.registerEntityClasses package)))
+  (-> ^OObjectDatabaseTx oc/*db* .getEntityManager (.registerEntityClasses package)))
 
-(defn save-only-dirty! "" [?] (.setSaveOnlyDirty ^ODatabaseObjectTx *db* ?))
-(defn save-only-dirty? "" [] (.isSaveOnlyDirty ^ODatabaseObjectTx *db*))
-(defn set-dirty! "" [pojo] (.setDirty ^ODatabaseObjectTx *db* pojo))
+(defn save-only-dirty! "" [?] (.setSaveOnlyDirty ^OObjectDatabaseTx oc/*db* ?))
+(defn save-only-dirty? "" [] (.isSaveOnlyDirty ^OObjectDatabaseTx oc/*db*))
+(defn set-dirty! "" [pojo] (.setDirty ^OObjectDatabaseTx oc/*db* pojo))
 
 (defn new-obj
   "Creates a new object through the Object DB.
 The class can be a Class object or a keyword."
-  [klass]
-  (.newInstance ^ODatabaseObjectTx *db*
-    (if (class? klass)
-      klass
-      (kw->oclass-name klass))))
+  ([] (.newInstance ^OObjectDatabaseTx oc/*db*))
+  ([klass]
+   (.newInstance ^OObjectDatabaseTx oc/*db*
+     (if (class? klass)
+       klass
+       (oc/kw->oclass-name klass))))
+  ([klass & args]
+   (.newInstance ^OObjectDatabaseTx oc/*db*
+     (if (class? klass)
+       klass
+       (oc/kw->oclass-name klass))
+     (to-array args))))

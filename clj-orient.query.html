@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html><head><link href="css/default.css" rel="stylesheet" type="text/css"><script src="js/jquery.min.js" type="text/javascript"></script><script src="js/page_effects.js" type="text/javascript"></script><title>clj-orient.query documentation</title></head><body><div id="header"><h1><a href="index.html">Clj-orient 0.5.0 API documentation</a></h1></div><div class="sidebar" id="namespaces"><h3><span>Namespaces</span></h3><ul><li><a href="clj-orient.core.html"><span>clj-orient.core</span></a></li><li><a href="clj-orient.graph.html"><span>clj-orient.graph</span></a></li><li><a href="clj-orient.object.html"><span>clj-orient.object</span></a></li><li class="current"><a href="clj-orient.query.html"><span>clj-orient.query</span></a></li><li><a href="clj-orient.schema.html"><span>clj-orient.schema</span></a></li><li><a href="clj-orient.script.html"><span>clj-orient.script</span></a></li><li><a href="clj-orient.script.clojure.html"><span>clj-orient.script.clojure</span></a></li></ul></div><div class="sidebar" id="vars"><h3>Public Vars</h3><ul><li><a href="clj-orient.query.html#var--%3Enative-query"><span>-&gt;native-query</span></a></li><li><a href="clj-orient.query.html#var-clj-command%21"><span>clj-command!</span></a></li><li><a href="clj-orient.query.html#var-clj-query"><span>clj-query</span></a></li><li><a href="clj-orient.query.html#var-clj-query*"><span>clj-query*</span></a></li><li><a href="clj-orient.query.html#var-defsqlfn"><span>defsqlfn</span></a></li><li><a href="clj-orient.query.html#var-install-sql-fns%21"><span>install-sql-fns!</span></a></li><li><a href="clj-orient.query.html#var-native-query"><span>native-query</span></a></li><li><a href="clj-orient.query.html#var-sql-command%21"><span>sql-command!</span></a></li><li><a href="clj-orient.query.html#var-sql-query"><span>sql-query</span></a></li><li><a href="clj-orient.query.html#var-traverse"><span>traverse</span></a></li></ul></div><div class="namespace-docs" id="content"><h2>clj-orient.query documentation</h2><pre class="doc">This namespace wraps the querying functionality, both for native queries and SQL queries.
+</pre><div class="public" id="var--%3Enative-query"><h3>-&gt;native-query</h3><div class="usage"><code>(-&gt;native-query kclass fn-kvs)</code></div><pre class="doc">Takes either a function or a hash-map and returns an ONativeSynchQuery object.
+
+When provided a filtering function, you will have to make your own query using the available Java methods
+for the OQueryContextNativeSchema instance you will be given.
+
+When provided a hash-map, matching will be done like this:
+{:field1 val1
+ :field2 [&lt;command&gt; val2]}
+
+e.g.
+{:country &quot;USA&quot;,
+ :age [:$&gt;= 20]
+ :last-name [:$not= &quot;Smith&quot;]}
+
+Available operators:
+:$=, :$not=, :$&lt;, :$&lt;=, :$&gt;, :$&gt;=, :$like, :$matches
+
+When not provided a command, it works like :$= (.eq).</pre></div><div class="public" id="var-clj-command%21"><h3>clj-command!</h3><div class="usage"><code>(clj-command! query-map)</code></div><pre class="doc">Runs a SQL command against the database written as a Clojure map.
+</pre></div><div class="public" id="var-clj-query"><h3>clj-query</h3><div class="usage"><code>(clj-query {fetch-plan :$fetch-plan, :as query-map} args)</code></div><pre class="doc">Does a SQL query against the database written as a Clojure map.
+</pre></div><div class="public" id="var-clj-query*"><h3>clj-query*</h3><div class="usage"><code>(clj-query* {fetch-plan :$fetch-plan, :as query-map} args)</code></div><pre class="doc">Same as clj-query, but transforms the map into a SQL string at compile time.
+</pre></div><div class="public" id="var-defsqlfn"><h3>defsqlfn</h3><div class="usage"><code>(defsqlfn sym args &amp; body)</code></div><pre class="doc">Defines a new SQL function that can be installed on the SQL engine.
+Besides the arguments passed to the function, it will also receive the hidden params *document* and *requester*,
+of types ODocument and OCommandExecutor respectively.
+
+If the function does not access within it's body the hidden params *document* and *requester*, a local (Clojure) version of the
+function will also be defined.</pre></div><div class="public" id="var-install-sql-fns%21"><h3>install-sql-fns!</h3><div class="usage"><code>(install-sql-fns!)</code></div><pre class="doc">Installs the previously defined SQL functions in the database.
+</pre></div><div class="public" id="var-native-query"><h3>native-query</h3><div class="usage"><code>(native-query klass query &amp; [fetch-plan])</code></div><pre class="doc">Executes a native query that filters results by the class of the documents (as a keyword) and a filtering function.
+It takes either an ONativeSynchQuery object, a function or a hash-map.
+Returns results as a lazy-seq of CljODoc objects.</pre></div><div class="public" id="var-sql-command%21"><h3>sql-command!</h3><div class="usage"><code>(sql-command! comm)</code><code>(sql-command! comm args)</code></div><pre class="doc">Runs the given SQL command.
+</pre></div><div class="public" id="var-sql-query"><h3>sql-query</h3><div class="usage"><code>(sql-query qry args paginate? fetch-plan)</code><code>(sql-query qry)</code><code>(sql-query qry args)</code><code>(sql-query qry args paginate?-or-fetch-plan)</code></div><pre class="doc">Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and the option to paginate results.
+When using positional parameters (?), use a vector.
+When using named parameters (:named), use a hash-map.</pre></div><div class="public" id="var-traverse"><h3>traverse</h3><div class="usage"><code>(traverse fields target pred &amp; [limit])</code></div><pre class="doc">fields = vector of keywords.
+target = oclass keyword or ORID.
+pred = function that takes a CljODoc and a function that takes a keyword for accessing context variables.
+(optional) limit = an integer.
+
+Returns results as a lazy-seq of CljODoc objects.</pre></div></div></body></html>

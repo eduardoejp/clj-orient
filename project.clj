@@ -6,12 +6,13 @@
             :distribution :repo
             :comments "same as Clojure"}
   :plugins [[lein-autodoc "0.9.0"]
-            [lein-swank "1.4.4"]]
+            [lein-swank "1.4.4"]
+            [codox "0.6.1"]]
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [com.orientechnologies/orient-commons "1.1.0"]
                  [com.orientechnologies/orientdb-client "1.1.0"]
                  [com.orientechnologies/orientdb-core "1.1.0"]
-                 #_[com.orientechnologies/orientdb-object "1.1.0"]
+                 [com.orientechnologies/orientdb-object "1.1.0"]
                  ]
   :repositories {"sonatype" "https://oss.sonatype.org/content/groups/public/"}
   :autodoc {:name "clj-orient"
@@ -20,4 +21,5 @@
             :web-src-dir "http://github.com/eduardoejp/clj-orient/blob/"
             :web-home "http://eduardoejp.github.com/clj-orient/"
             :output-path "autodoc"}
+  :codox {:exclude clj-orient.kv}
   )

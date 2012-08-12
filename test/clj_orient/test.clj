@@ -240,19 +240,19 @@
   (are [x y] (= x y)
        1 (count (oq/sql-query "SELECT FROM person WHERE name = ?" ["Bob"] "*:-1"))
        1 (count (oq/sql-query "SELECT FROM person WHERE name = :name" {:name "Bill"}))
-       2 (count (oq/sql-query "SELECT FROM person" nil "*:-1"))
+       2 (count (oq/sql-query "SELECT FROM person" [] "*:-1"))
        0 (count (oq/sql-query "SELECT FROM person WHERE notPass()" nil))
-       1 (count (oq/clj-query '{:from person :where [(= name ?)], :$fetch-plan "*:-1"} ["Bob"]))
+       1 (count (oq/clj-query '{:from person :where [(= name ?)]} ["Bob"] "*:-1"))
        1 (count (oq/clj-query '{:from person :where [(= name ?name)]} {:name "Bill"}))
-       2 (count (oq/clj-query '{:from person, :$fetch-plan "*:-1"} nil))
-       0 (count (oq/clj-query '{:from person :where [(notPass)]} nil))
+       2 (count (oq/clj-query '{:from person} [] "*:-1"))
+       0 (count (oq/clj-query '{:from person :where [(notPass)]}))
        "Bob" (:name (first (oq/sql-query "SELECT FROM person WHERE allowBob(name)" nil)))
        ))
 
 (deftest massive-insert-test
   (prn "<TEST START>" 'massive-insert-test)
   (let [docs (map (fn [n] {:id n}) (range 1000))]
-    (print "Normael Insertion of 1K documents -> ")
+    (print "Normal Insertion of 1K documents -> ")
     (time
      (dotimes [n 1000]
       (oc/save! (oc/document :batch1 {:id n}))))

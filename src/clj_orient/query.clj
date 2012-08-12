@@ -140,19 +140,13 @@ Returns results as a lazy-seq of CljODoc objects."
   "Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and the option to paginate results.
 When using positional parameters (?), use a vector.
 When using named parameters (:named), use a hash-map."
-  ([qry args paginate? fetch-plan]
+  ([qry & [args fetch-plan paginate?]]
    (let [sqry (OSQLSynchQuery. qry)
          sqry (if fetch-plan (.setFetchPlan sqry fetch-plan) sqry)
          res (.query *db* sqry (prep-args args))]
      (if paginate?
        (lazy-cat (map #(CljODoc. %) res) (paginate qry args (-> res last .getIdentity .next)))
-       (map #(CljODoc. %) res))))
-  ([qry] (sql-query qry nil nil nil))
-  ([qry args] (sql-query qry args nil nil))
-  ([qry args paginate?-or-fetch-plan]
-   (if (string? paginate?-or-fetch-plan)
-     (sql-query qry args nil paginate?-or-fetch-plan)
-     (sql-query qry args paginate?-or-fetch-plan nil))))
+       (map #(CljODoc. %) res)))))
 
 (defn sql-command! "Runs the given SQL command."
   ([comm] (-> ^ODatabaseComplex *db* (.command (OCommandSQL. comm)) (.execute (object-array 0))) nil)
@@ -367,12 +361,12 @@ function will also be defined."
   )
 
 (defn clj-query "Does a SQL query against the database written as a Clojure map."
-  [{fetch-plan :$fetch-plan, :as query-map} args]
-  (sql-query (map->sql query-map) args nil fetch-plan))
+  [query-map & [args fetch-plan paginate?]]
+  (sql-query (map->sql query-map) args fetch-plan paginate?))
 
 (defmacro clj-query* "Same as clj-query, but transforms the map into a SQL string at compile time."
-  [{fetch-plan :$fetch-plan, :as query-map} args]
-  `(sql-query ~(map->sql query-map) ~args nil ~fetch-plan))
+  [query-map & [args fetch-plan paginate?]]
+  `(sql-query ~(map->sql query-map) ~args ~fetch-plan ~paginate?))
 
 (defn clj-command! "Runs a SQL command against the database written as a Clojure map."
   [query-map]

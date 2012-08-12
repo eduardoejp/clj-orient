@@ -18,8 +18,8 @@ Available operators:
 :$=, :$not=, :$&lt;, :$&lt;=, :$&gt;, :$&gt;=, :$like, :$matches
 
 When not provided a command, it works like :$= (.eq).</pre></div><div class="public" id="var-clj-command%21"><h3>clj-command!</h3><div class="usage"><code>(clj-command! query-map)</code></div><pre class="doc">Runs a SQL command against the database written as a Clojure map.
-</pre></div><div class="public" id="var-clj-query"><h3>clj-query</h3><div class="usage"><code>(clj-query {fetch-plan :$fetch-plan, :as query-map} args)</code></div><pre class="doc">Does a SQL query against the database written as a Clojure map.
-</pre></div><div class="public" id="var-clj-query*"><h3>clj-query*</h3><div class="usage"><code>(clj-query* {fetch-plan :$fetch-plan, :as query-map} args)</code></div><pre class="doc">Same as clj-query, but transforms the map into a SQL string at compile time.
+</pre></div><div class="public" id="var-clj-query"><h3>clj-query</h3><div class="usage"><code>(clj-query query-map &amp; [args fetch-plan paginate?])</code></div><pre class="doc">Does a SQL query against the database written as a Clojure map.
+</pre></div><div class="public" id="var-clj-query*"><h3>clj-query*</h3><div class="usage"><code>(clj-query* query-map &amp; [args fetch-plan paginate?])</code></div><pre class="doc">Same as clj-query, but transforms the map into a SQL string at compile time.
 </pre></div><div class="public" id="var-defsqlfn"><h3>defsqlfn</h3><div class="usage"><code>(defsqlfn sym args &amp; body)</code></div><pre class="doc">Defines a new SQL function that can be installed on the SQL engine.
 Besides the arguments passed to the function, it will also receive the hidden params *document* and *requester*,
 of types ODocument and OCommandExecutor respectively.
@@ -29,7 +29,7 @@ function will also be defined.</pre></div><div class="public" id="var-install-sq
 </pre></div><div class="public" id="var-native-query"><h3>native-query</h3><div class="usage"><code>(native-query klass query &amp; [fetch-plan])</code></div><pre class="doc">Executes a native query that filters results by the class of the documents (as a keyword) and a filtering function.
 It takes either an ONativeSynchQuery object, a function or a hash-map.
 Returns results as a lazy-seq of CljODoc objects.</pre></div><div class="public" id="var-sql-command%21"><h3>sql-command!</h3><div class="usage"><code>(sql-command! comm)</code><code>(sql-command! comm args)</code></div><pre class="doc">Runs the given SQL command.
-</pre></div><div class="public" id="var-sql-query"><h3>sql-query</h3><div class="usage"><code>(sql-query qry args paginate? fetch-plan)</code><code>(sql-query qry)</code><code>(sql-query qry args)</code><code>(sql-query qry args paginate?-or-fetch-plan)</code></div><pre class="doc">Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and the option to paginate results.
+</pre></div><div class="public" id="var-sql-query"><h3>sql-query</h3><div class="usage"><code>(sql-query qry &amp; [args fetch-plan paginate?])</code></div><pre class="doc">Runs the given SQL query with the given parameters (as a Clojure vector or hash-map) and the option to paginate results.
 When using positional parameters (?), use a vector.
 When using named parameters (:named), use a hash-map.</pre></div><div class="public" id="var-traverse"><h3>traverse</h3><div class="usage"><code>(traverse fields target pred &amp; [limit])</code></div><pre class="doc">fields = vector of keywords.
 target = oclass keyword or ORID.

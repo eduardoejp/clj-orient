@@ -256,7 +256,7 @@ It can optionally take a Clojure hash-map to set the document's properties."
         (finally
          (.declareIntent *db* nil))))
 
-(defn documents
+(defn documents!
   "Massively inserts documents of the given class into the database in an efficient manner.
 The documents must be passed as a sequence of hash-maps."
   [klass props*]
@@ -599,7 +599,12 @@ If no output stream is passed, a java.io.ByteArrayOutputStream will be created, 
     (<method> (.-odoc d)))
   pin!    .pin      "Suggests to the engine to keep the record in cache."
   unpin!  .unpin    "Suggests to the engine to not keep the record in cache."
-  reload! .reload   "Loads the record content in memory."
   unload! .unload   "Unloads current record."
   pinned? .isPinned "Checks if the record is pinned."
   )
+
+(defn reload!
+  "Loads the record content in memory."
+  ([doc] (.reload (.-odoc doc)))
+  ([doc fetch-plan] (.reload (.-odoc doc) fetch-plan))
+  ([doc fetch-plan ignore-cache?] (.reload (.-odoc doc) fetch-plan ignore-cache?)))

@@ -257,7 +257,7 @@
      (dotimes [n 1000]
       (oc/save! (oc/document :batch1 {:id n}))))
     (print "Massive Insertion of 1K documents -> ")
-    (time (oc/documents :batch2 docs)))
+    (time (oc/documents! :batch2 docs)))
   (is (= 1000 (count (oq/clj-query '{:from batch2} nil))))
   )
 

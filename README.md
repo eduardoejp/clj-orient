@@ -71,13 +71,17 @@ Working with documents:
 Working with classes:
 
 	(use '(clj-orient core graph))
-	(create-class! :user)
-	(derive! :user (vertex-base-class))
-	(create-class! :knows (edge-base-class))
+
+	(with-db (open-graph-db! "remote:localhost/my-graph-db" "writer" "writer")
+	  (create-class! :user)
+	  (derive! :user (vertex-base-class))
+	  (create-class! :knows (edge-base-class)))
 
 Working with the graph-db:
 
 	(use 'clj-orient.graph)
+
+	(set-db! (open-graph-db! "remote:localhost/my-graph-db" "writer" "writer"))
 	(let [a (save! (vertex :user {:first-name "John", :last-name "Doe", :age 20, :country "USA"}))
 	      b (save! (vertex :user {:first-name "Jane", :last-name "Doe", :age 25, :country "USA"}))]
 	  (save! (link! a :knows {:since (java.util.Date.)} b)))
